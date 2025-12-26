@@ -2,7 +2,7 @@
 //  EarthLordApp.swift
 //  EarthLord
 //
-//  Created by 周小红 on 2025/12/24.
+//  Created by 周小红 on 2025/12/26.
 //
 
 import SwiftUI
