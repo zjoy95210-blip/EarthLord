@@ -9,17 +9,24 @@ import SwiftUI
 
 struct ContentView: View {
     var body: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+        NavigationStack {
+            VStack(spacing: 20) {
+                Image(systemName: "globe")
+                    .imageScale(.large)
+                    .foregroundStyle(.tint)
+                Text("Hello, world!")
 
-            Text("Developed by Joy周")
-                .font(.headline)
-                .foregroundStyle(.secondary)
+                Text("Developed by Joy周")
+                    .font(.headline)
+                    .foregroundStyle(.secondary)
+
+                NavigationLink("进入测试页") {
+                    TestView()
+                }
+                .buttonStyle(.borderedProminent)
+            }
+            .padding()
         }
-        .padding()
     }
 }
 
