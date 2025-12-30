@@ -24,5 +24,12 @@ enum SupabaseConfig {
 /// 全局 Supabase 客户端实例
 let supabase = SupabaseClient(
     supabaseURL: SupabaseConfig.supabaseURL,
-    supabaseKey: SupabaseConfig.supabaseAnonKey
+    supabaseKey: SupabaseConfig.supabaseAnonKey,
+    options: .init(
+        auth: .init(
+            // 采用新的 session 行为，本地存储的 session 总是被发出
+            // 参考: https://github.com/supabase/supabase-swift/pull/822
+            emitLocalSessionAsInitialSession: true
+        )
+    )
 )

@@ -376,8 +376,8 @@ final class AuthManager: ObservableObject, Sendable {
         do {
             // 1. 获取当前窗口的 rootViewController
             print("🔵 [Google登录] 正在获取 rootViewController...")
-            guard let windowScene = await UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                  let rootViewController = await windowScene.windows.first?.rootViewController else {
+            guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                  let rootViewController = windowScene.windows.first?.rootViewController else {
                 print("❌ [Google登录] 无法获取 rootViewController")
                 errorMessage = "无法启动 Google 登录"
                 isLoading = false
@@ -472,6 +472,67 @@ final class AuthManager: ObservableObject, Sendable {
         }
 
         isLoading = false
+    }
+
+    /// 删除账户
+    /// - Note: 调用 Edge Function 删除用户账户
+    func deleteAccount() async -> Bool {
+        print("🔴 [删除账户] 开始删除账户流程...")
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            // 1. 获取当前 session 的 accessToken
+            print("🔴 [删除账户] 正在获取 accessToken...")
+            let session = try await supabase.auth.session
+            let accessToken = session.accessToken
+            print("✅ [删除账户] 成功获取 accessToken")
+
+            // 2. 定义响应结构
+            struct DeleteResponse: Decodable {
+                let success: Bool?
+                let error: String?
+                let message: String?
+            }
+
+            // 3. 调用 Edge Function
+            print("🔴 [删除账户] 正在调用 Edge Function...")
+            let result: DeleteResponse = try await supabase.functions.invoke(
+                "delete-account",
+                options: .init(
+                    headers: ["Authorization": "Bearer \(accessToken)"]
+                )
+            )
+
+            // 4. 检查响应
+            print("🔴 [删除账户] 收到响应，正在解析...")
+
+            if let error = result.error {
+                print("❌ [删除账户] 服务器返回错误: \(error)")
+                errorMessage = error
+                isLoading = false
+                return false
+            }
+
+            // 4. 删除成功，清理本地状态
+            print("✅ [删除账户] 账户删除成功!")
+            currentUser = nil
+            isAuthenticated = false
+            needsPasswordSetup = false
+            otpSent = false
+            otpVerified = false
+            currentEmail = nil
+
+            isLoading = false
+            return true
+
+        } catch {
+            print("❌ [删除账户] 错误: \(error)")
+            print("❌ [删除账户] 错误类型: \(type(of: error))")
+            errorMessage = "删除账户失败: \(error.localizedDescription)"
+            isLoading = false
+            return false
+        }
     }
 
     /// 检查现有会话
