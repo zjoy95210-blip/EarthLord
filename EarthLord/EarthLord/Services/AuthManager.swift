@@ -482,29 +482,20 @@ final class AuthManager: ObservableObject, Sendable {
         errorMessage = nil
 
         do {
-            // 1. 获取当前 session 的 accessToken
-            print("🔴 [删除账户] 正在获取 accessToken...")
-            let session = try await supabase.auth.session
-            let accessToken = session.accessToken
-            print("✅ [删除账户] 成功获取 accessToken")
-
-            // 2. 定义响应结构
+            // 1. 定义响应结构
             struct DeleteResponse: Decodable {
                 let success: Bool?
                 let error: String?
                 let message: String?
             }
 
-            // 3. 调用 Edge Function
+            // 2. 调用 Edge Function（SDK 会自动添加认证 header）
             print("🔴 [删除账户] 正在调用 Edge Function...")
             let result: DeleteResponse = try await supabase.functions.invoke(
-                "delete-account",
-                options: .init(
-                    headers: ["Authorization": "Bearer \(accessToken)"]
-                )
+                "delete-account"
             )
 
-            // 4. 检查响应
+            // 3. 检查响应
             print("🔴 [删除账户] 收到响应，正在解析...")
 
             if let error = result.error {
