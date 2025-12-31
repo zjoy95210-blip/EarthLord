@@ -15,6 +15,9 @@ struct RootView: View {
     /// 认证管理器（使用共享实例）
     @ObservedObject private var authManager = AuthManager.shared
 
+    /// 语言管理器（使用共享实例）
+    @ObservedObject private var languageManager = LanguageManager.shared
+
     var body: some View {
         ZStack {
             if !splashFinished {
@@ -32,6 +35,7 @@ struct RootView: View {
                     .environmentObject(authManager)
             }
         }
+        .environment(\.locale, languageManager.currentLocale)
         .animation(.easeInOut(duration: 0.3), value: splashFinished)
         .animation(.easeInOut(duration: 0.3), value: authManager.isAuthenticated)
     }

@@ -123,7 +123,7 @@ struct AuthView: View {
         .cornerRadius(12)
     }
 
-    private func tabButton(title: String, index: Int) -> some View {
+    private func tabButton(title: LocalizedStringKey, index: Int) -> some View {
         Button {
             withAnimation(.easeInOut(duration: 0.2)) {
                 selectedTab = index

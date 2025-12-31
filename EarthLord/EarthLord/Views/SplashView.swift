@@ -16,7 +16,7 @@ struct SplashView: View {
     @State private var isAnimating = false
 
     /// 加载进度文字
-    @State private var loadingText = "正在初始化..."
+    @State private var loadingText: LocalizedStringKey = "正在初始化..."
 
     /// Logo 缩放动画
     @State private var logoScale: CGFloat = 0.8

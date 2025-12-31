@@ -12,6 +12,12 @@ struct ProfileTabView: View {
     /// 认证管理器
     @ObservedObject private var authManager = AuthManager.shared
 
+    /// 语言管理器
+    @ObservedObject private var languageManager = LanguageManager.shared
+
+    /// 当前环境的 Locale
+    @Environment(\.locale) private var locale
+
     /// 是否显示退出确认弹窗
     @State private var showLogoutAlert = false
 
@@ -27,12 +33,15 @@ struct ProfileTabView: View {
     /// 是否正在删除
     @State private var isDeleting = false
 
-    /// 删除确认关键词
-    private let deleteKeyword = "删除"
-
     /// 当前用户
     private var currentUser: User? {
         authManager.currentUser
+    }
+
+    /// 删除确认关键词（根据当前语言）
+    private var deleteKeyword: String {
+        let langCode = locale.language.languageCode?.identifier ?? "zh"
+        return langCode.hasPrefix("zh") ? "删除" : "DELETE"
     }
 
     /// 是否可以删除（输入匹配关键词）
@@ -61,6 +70,26 @@ struct ProfileTabView: View {
                     } label: {
                         Label("修改密码", systemImage: "lock")
                     }
+                }
+
+                // 语言设置
+                Section {
+                    Picker(selection: $languageManager.selectedLanguage) {
+                        ForEach(AppLanguage.allCases) { language in
+                            Text(language.localizedName)
+                                .tag(language)
+                        }
+                    } label: {
+                        Label {
+                            Text("语言")
+                        } icon: {
+                            Image(systemName: "globe")
+                        }
+                    }
+                } header: {
+                    Text("语言")
+                } footer: {
+                    Text("切换语言后立即生效，无需重启 App")
                 }
 
                 // 游戏数据
