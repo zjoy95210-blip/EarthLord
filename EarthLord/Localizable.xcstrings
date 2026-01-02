@@ -1,6 +1,9 @@
 {
   "sourceLanguage" : "zh-Hans",
   "strings" : {
+    "《地球新主》需要获取您的位置来显示您在末日世界中的坐标，帮助您探索和圈定领地。" : {
+
+    },
     "%lld" : {
 
     },
@@ -144,6 +147,26 @@
         }
       }
     },
+    "前往设置" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Go to Settings"
+          }
+        }
+      }
+    },
+    "卫星图" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Satellite"
+          }
+        }
+      }
+    },
     "发现的POI" : {
       "localizations" : {
         "en" : {
@@ -204,6 +227,16 @@
         }
       }
     },
+    "定位权限已关闭" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Location Permission Disabled"
+          }
+        }
+      }
+    },
     "密码" : {
       "localizations" : {
         "en" : {
@@ -220,6 +253,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Developer Tools"
+          }
+        }
+      }
+    },
+    "当前坐标" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Current Location"
           }
         }
       }
@@ -315,6 +358,7 @@
       }
     },
     "探索和圈占领地" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -383,6 +427,9 @@
           }
         }
       }
+    },
+    "正在定位..." : {
+
     },
     "正在检查登录状态..." : {
       "localizations" : {
