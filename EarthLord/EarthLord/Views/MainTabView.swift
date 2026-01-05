@@ -52,6 +52,14 @@ struct MainTabView: View {
                     Text("通讯")
                 }
                 .tag(4)
+
+            // 更多 - 开发测试入口
+            MoreTabView()
+                .tabItem {
+                    Image(systemName: "ellipsis.circle.fill")
+                    Text("更多")
+                }
+                .tag(5)
         }
         .tint(ApocalypseTheme.primary)
     }

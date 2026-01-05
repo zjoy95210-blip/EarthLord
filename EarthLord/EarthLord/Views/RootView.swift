@@ -33,6 +33,7 @@ struct RootView: View {
                 MainTabView()
                     .transition(.opacity)
                     .environmentObject(authManager)
+                    .environmentObject(LocationManager.shared)
             }
         }
         .environment(\.locale, languageManager.currentLocale)

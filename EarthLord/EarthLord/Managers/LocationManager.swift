@@ -209,6 +209,7 @@ final class LocationManager: NSObject, ObservableObject {
         }
 
         print("🚶 [路径] 开始路径追踪")
+        TerritoryLogger.shared.log("开始圈地追踪", type: .info)
 
         // 清除旧路径
         clearPath()
@@ -252,6 +253,7 @@ final class LocationManager: NSObject, ObservableObject {
         }
 
         print("🛑 [路径] 停止路径追踪")
+        TerritoryLogger.shared.log("停止追踪，共 \(pathCoordinates.count) 个点", type: .info)
 
         // 停止定时器
         pathUpdateTimer?.invalidate()
@@ -297,16 +299,17 @@ final class LocationManager: NSObject, ObservableObject {
         let newCoordinate = location.coordinate
 
         // 检查是否需要记录（与上一个点距离 > 10米）
+        var distanceFromLast: Double = 0
         if let lastCoordinate = pathCoordinates.last {
             let lastLocation = CLLocation(latitude: lastCoordinate.latitude, longitude: lastCoordinate.longitude)
-            let distance = location.distance(from: lastLocation)
+            distanceFromLast = location.distance(from: lastLocation)
 
             // 距离不足，跳过
-            if distance < minimumPathDistance {
+            if distanceFromLast < minimumPathDistance {
                 return
             }
 
-            print("📍 [路径] 距离上点 \(String(format: "%.1f", distance))米，记录新点")
+            print("📍 [路径] 距离上点 \(String(format: "%.1f", distanceFromLast))米，记录新点")
         } else {
             print("📍 [路径] 记录第一个点")
         }
@@ -320,6 +323,13 @@ final class LocationManager: NSObject, ObservableObject {
 
         // 更新版本号触发 UI 刷新
         pathUpdateVersion += 1
+
+        // 记录日志
+        if pathCoordinates.count == 1 {
+            TerritoryLogger.shared.log("记录第 1 个点", type: .info)
+        } else {
+            TerritoryLogger.shared.log("记录第 \(pathCoordinates.count) 个点，距上点 \(String(format: "%.1f", distanceFromLast))m", type: .info)
+        }
 
         print("📍 [路径] 当前路径点数: \(pathCoordinates.count)")
 
@@ -353,6 +363,9 @@ final class LocationManager: NSObject, ObservableObject {
 
         print("🔄 [闭环] 检测中... 首尾距离: \(String(format: "%.1f", distance))米，阈值: \(closureDistanceThreshold)米")
 
+        // 记录闭环检测日志
+        TerritoryLogger.shared.log("距起点 \(String(format: "%.1f", distance))m (需≤\(Int(closureDistanceThreshold))m)", type: .info)
+
         // 距离小于阈值则闭合成功
         if distance <= closureDistanceThreshold {
             isPathClosed = true
@@ -361,6 +374,7 @@ final class LocationManager: NSObject, ObservableObject {
             pathUpdateVersion += 1
 
             print("✅ [闭环] 闭环检测成功！首尾距离: \(String(format: "%.1f", distance))米")
+            TerritoryLogger.shared.log("闭环成功！距起点 \(String(format: "%.1f", distance))m", type: .success)
 
             // 自动停止追踪
             if isTracking {
@@ -408,6 +422,7 @@ final class LocationManager: NSObject, ObservableObject {
             isOverSpeed = true
 
             print("🚫 [速度] 严重超速！速度: \(String(format: "%.1f", speedKmh)) km/h，自动停止追踪")
+            TerritoryLogger.shared.log("超速 \(String(format: "%.1f", speedKmh)) km/h，已停止追踪", type: .error)
 
             // 自动停止追踪
             stopPathTracking()
@@ -424,6 +439,7 @@ final class LocationManager: NSObject, ObservableObject {
             isOverSpeed = true
 
             print("⚠️ [速度] 速度警告！速度: \(String(format: "%.1f", speedKmh)) km/h")
+            TerritoryLogger.shared.log("速度较快 \(String(format: "%.1f", speedKmh)) km/h", type: .warning)
 
             // 3秒后清除警告
             scheduleWarningDismissal()
