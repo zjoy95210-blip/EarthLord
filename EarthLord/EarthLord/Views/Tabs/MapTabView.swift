@@ -2,7 +2,7 @@
 //  MapTabView.swift
 //  EarthLord
 //
-//  地图页面 - 显示末世风格地图、用户位置和圈地功能
+//  地图页面 - 显示末世风格地图、用户位置、圈地功能和速度警告
 //
 
 import SwiftUI
@@ -35,7 +35,8 @@ struct MapTabView: View {
                 zoomLevel: 1000,
                 trackingPath: $locationManager.pathCoordinates,
                 pathUpdateVersion: locationManager.pathUpdateVersion,
-                isTracking: locationManager.isTracking
+                isTracking: locationManager.isTracking,
+                isPathClosed: locationManager.isPathClosed
             )
             .ignoresSafeArea()
 
@@ -56,16 +57,30 @@ struct MapTabView: View {
             .ignoresSafeArea()
 
             // UI 叠加层
-            VStack {
+            VStack(spacing: 0) {
+                // 速度警告横幅
+                if locationManager.speedWarning != nil {
+                    speedWarningBanner
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+
                 // 顶部信息栏
                 topInfoBar
 
                 Spacer()
 
+                // 闭环成功提示
+                if locationManager.isPathClosed {
+                    closureSuccessBanner
+                        .transition(.scale.combined(with: .opacity))
+                }
+
                 // 底部控制栏
                 bottomControlBar
             }
             .padding()
+            .animation(.easeInOut(duration: 0.3), value: locationManager.speedWarning != nil)
+            .animation(.spring(response: 0.5, dampingFraction: 0.7), value: locationManager.isPathClosed)
 
             // 权限拒绝提示
             if locationManager.isDenied {
@@ -75,6 +90,73 @@ struct MapTabView: View {
         .onAppear {
             setupLocation()
         }
+    }
+
+    // MARK: - 速度警告横幅
+
+    private var speedWarningBanner: some View {
+        HStack(spacing: 10) {
+            // 图标
+            Image(systemName: locationManager.isTracking ? "exclamationmark.triangle.fill" : "xmark.octagon.fill")
+                .font(.system(size: 18, weight: .semibold))
+
+            // 警告文字
+            Text(locationManager.speedWarning ?? "")
+                .font(.system(size: 14, weight: .medium))
+
+            Spacer()
+
+            // 关闭按钮
+            Button {
+                locationManager.clearSpeedWarning()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .bold))
+                    .padding(6)
+                    .background(Color.white.opacity(0.2))
+                    .clipShape(Circle())
+            }
+        }
+        .foregroundColor(.white)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(locationManager.isTracking ? Color.orange : Color.red)
+        )
+        .shadow(color: (locationManager.isTracking ? Color.orange : Color.red).opacity(0.4), radius: 8, x: 0, y: 4)
+        .padding(.top, 50)
+    }
+
+    // MARK: - 闭环成功提示
+
+    private var closureSuccessBanner: some View {
+        HStack(spacing: 10) {
+            // 图标
+            Image(systemName: "checkmark.seal.fill")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundColor(.white)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("领地圈定成功！")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(.white)
+
+                Text("共 \(locationManager.pathPointCount) 个坐标点")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.white.opacity(0.8))
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.green)
+        )
+        .shadow(color: Color.green.opacity(0.4), radius: 8, x: 0, y: 4)
+        .padding(.bottom, 10)
     }
 
     // MARK: - 顶部信息栏
@@ -120,6 +202,22 @@ struct MapTabView: View {
 
             Spacer()
 
+            // 速度显示（追踪时）
+            if locationManager.isTracking && locationManager.currentSpeed > 0 {
+                HStack(spacing: 4) {
+                    Image(systemName: "speedometer")
+                        .foregroundColor(speedColor)
+
+                    Text(String(format: "%.1f km/h", locationManager.currentSpeed))
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundColor(speedColor)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(ApocalypseTheme.cardBackground.opacity(0.9))
+                .cornerRadius(8)
+            }
+
             // 地图类型指示
             HStack(spacing: 4) {
                 Image(systemName: "globe.asia.australia.fill")
@@ -134,7 +232,18 @@ struct MapTabView: View {
             .background(ApocalypseTheme.cardBackground.opacity(0.9))
             .cornerRadius(8)
         }
-        .padding(.top, 50)  // 避开状态栏
+        .padding(.top, locationManager.speedWarning != nil ? 10 : 50)
+    }
+
+    /// 速度颜色（根据速度值变化）
+    private var speedColor: Color {
+        if locationManager.currentSpeed > 30 {
+            return .red
+        } else if locationManager.currentSpeed > 15 {
+            return .orange
+        } else {
+            return ApocalypseTheme.primary
+        }
     }
 
     // MARK: - 底部控制栏
@@ -173,11 +282,14 @@ struct MapTabView: View {
         } label: {
             HStack(spacing: 8) {
                 // 图标
-                Image(systemName: locationManager.isTracking ? "stop.fill" : "flag.fill")
+                Image(systemName: buttonIcon)
                     .font(.system(size: 16, weight: .semibold))
 
                 // 文字
-                if locationManager.isTracking {
+                if locationManager.isPathClosed {
+                    Text("重新圈地")
+                        .font(.system(size: 14, weight: .semibold))
+                } else if locationManager.isTracking {
                     Text("停止圈地")
                         .font(.system(size: 14, weight: .semibold))
 
@@ -195,13 +307,36 @@ struct MapTabView: View {
             .padding(.vertical, 12)
             .background(
                 Capsule()
-                    .fill(locationManager.isTracking ? Color.red : ApocalypseTheme.primary)
+                    .fill(buttonColor)
             )
-            .shadow(color: (locationManager.isTracking ? Color.red : ApocalypseTheme.primary).opacity(0.4), radius: 8, x: 0, y: 4)
+            .shadow(color: buttonColor.opacity(0.4), radius: 8, x: 0, y: 4)
         }
         .disabled(!locationManager.isAuthorized)
         .opacity(locationManager.isAuthorized ? 1 : 0.5)
         .animation(.easeInOut(duration: 0.2), value: locationManager.isTracking)
+        .animation(.easeInOut(duration: 0.2), value: locationManager.isPathClosed)
+    }
+
+    /// 按钮图标
+    private var buttonIcon: String {
+        if locationManager.isPathClosed {
+            return "arrow.counterclockwise"
+        } else if locationManager.isTracking {
+            return "stop.fill"
+        } else {
+            return "flag.fill"
+        }
+    }
+
+    /// 按钮颜色
+    private var buttonColor: Color {
+        if locationManager.isPathClosed {
+            return .green
+        } else if locationManager.isTracking {
+            return .red
+        } else {
+            return ApocalypseTheme.primary
+        }
     }
 
     // MARK: - 权限拒绝覆盖层
@@ -298,7 +433,12 @@ struct MapTabView: View {
 
     /// 切换圈地追踪状态
     private func toggleTracking() {
-        if locationManager.isTracking {
+        if locationManager.isPathClosed {
+            // 已闭合，重新开始
+            locationManager.clearPath()
+            locationManager.startPathTracking()
+            print("🔄 [地图页] 重新开始圈地")
+        } else if locationManager.isTracking {
             // 停止追踪
             locationManager.stopPathTracking()
             print("🛑 [地图页] 停止圈地")
