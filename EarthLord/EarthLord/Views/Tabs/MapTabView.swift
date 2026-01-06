@@ -24,6 +24,9 @@ struct MapTabView: View {
     /// 地图视图引用（用于重新居中）
     @State private var mapView: MKMapView?
 
+    /// 是否显示验证结果横幅
+    @State private var showValidationBanner: Bool = false
+
     // MARK: - Body
 
     var body: some View {
@@ -69,9 +72,9 @@ struct MapTabView: View {
 
                 Spacer()
 
-                // 闭环成功提示
-                if locationManager.isPathClosed {
-                    closureSuccessBanner
+                // 验证结果横幅（根据验证结果显示成功或失败）
+                if showValidationBanner {
+                    validationResultBanner
                         .transition(.scale.combined(with: .opacity))
                 }
 
@@ -80,7 +83,7 @@ struct MapTabView: View {
             }
             .padding()
             .animation(.easeInOut(duration: 0.3), value: locationManager.speedWarning != nil)
-            .animation(.spring(response: 0.5, dampingFraction: 0.7), value: locationManager.isPathClosed)
+            .animation(.spring(response: 0.5, dampingFraction: 0.7), value: showValidationBanner)
 
             // 权限拒绝提示
             if locationManager.isDenied {
@@ -89,6 +92,23 @@ struct MapTabView: View {
         }
         .onAppear {
             setupLocation()
+        }
+        // 监听闭环状态，闭环后根据验证结果显示横幅
+        .onReceive(locationManager.$isPathClosed) { isClosed in
+            if isClosed {
+                // 闭环后延迟一点点，等待验证结果
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    withAnimation {
+                        showValidationBanner = true
+                    }
+                    // 3 秒后自动隐藏
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                        withAnimation {
+                            showValidationBanner = false
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -128,34 +148,38 @@ struct MapTabView: View {
         .padding(.top, 50)
     }
 
-    // MARK: - 闭环成功提示
+    // MARK: - 验证结果横幅
 
-    private var closureSuccessBanner: some View {
-        HStack(spacing: 10) {
-            // 图标
-            Image(systemName: "checkmark.seal.fill")
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundColor(.white)
+    /// 验证结果横幅（根据验证结果显示成功或失败）
+    private var validationResultBanner: some View {
+        HStack(spacing: 8) {
+            // 图标（成功/失败不同）
+            Image(systemName: locationManager.territoryValidationPassed
+                  ? "checkmark.circle.fill"
+                  : "xmark.circle.fill")
+                .font(.body)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text("领地圈定成功！")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(.white)
-
-                Text("共 \(locationManager.pathPointCount) 个坐标点")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.white.opacity(0.8))
+            // 文字（成功显示面积，失败显示错误信息）
+            if locationManager.territoryValidationPassed {
+                Text("圈地成功！领地面积: \(String(format: "%.0f", locationManager.calculatedArea))m²")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+            } else {
+                Text(locationManager.territoryValidationError ?? "验证失败")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
             }
-
-            Spacer()
         }
+        .foregroundColor(.white)
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
+        .frame(maxWidth: .infinity)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color.green)
+                .fill(locationManager.territoryValidationPassed ? Color.green : Color.red)
         )
-        .shadow(color: Color.green.opacity(0.4), radius: 8, x: 0, y: 4)
+        .shadow(color: (locationManager.territoryValidationPassed ? Color.green : Color.red).opacity(0.4),
+                radius: 8, x: 0, y: 4)
         .padding(.bottom, 10)
     }
 
