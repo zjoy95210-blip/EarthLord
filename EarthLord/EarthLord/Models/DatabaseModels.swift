@@ -72,9 +72,19 @@ struct Territory: Codable, Identifiable, Sendable {
         }
     }
 
-    /// 显示名称（如果没有名称则显示默认）
+    /// 显示名称（如果没有名称则显示面积）
     var displayName: String {
-        return name ?? "未命名领地"
+        if let name = name, !name.isEmpty {
+            return name
+        }
+        // 未命名时显示 "领地 + 面积"
+        if area >= 1_000_000 {
+            return String(format: "领地 %.2fkm²", area / 1_000_000)
+        } else if area >= 10_000 {
+            return String(format: "领地 %.2f万m²", area / 10_000)
+        } else {
+            return String(format: "领地 %.0fm²", area)
+        }
     }
 
     /// 格式化创建时间
