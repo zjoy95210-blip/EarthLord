@@ -110,17 +110,19 @@ struct TerritoryDetailView: View {
     // MARK: - 地图预览
 
     private var mapPreview: some View {
-        Map(coordinateRegion: .constant(mapRegion))
-            .overlay {
-                // 绘制领地轮廓
-                TerritoryPolygonOverlay(coordinates: territory.toCoordinates())
-            }
-            .frame(height: 200)
-            .cornerRadius(12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(ApocalypseTheme.primary.opacity(0.3), lineWidth: 1)
-            )
+        Map(position: .constant(.region(mapRegion))) {
+            // 空的 MapContentBuilder
+        }
+        .overlay {
+            // 绘制领地轮廓
+            TerritoryPolygonOverlay(coordinates: territory.toCoordinates())
+        }
+        .frame(height: 200)
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(ApocalypseTheme.primary.opacity(0.3), lineWidth: 1)
+        )
     }
 
     // MARK: - 信息卡片
