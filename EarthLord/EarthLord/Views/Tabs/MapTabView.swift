@@ -7,6 +7,7 @@
 
 import SwiftUI
 import MapKit
+import Auth
 
 struct MapTabView: View {
 
@@ -14,6 +15,9 @@ struct MapTabView: View {
 
     /// 定位管理器
     @StateObject private var locationManager = LocationManager.shared
+
+    /// 认证管理器
+    @StateObject private var authManager = AuthManager.shared
 
     /// 用户位置坐标
     @State private var userLocation: CLLocationCoordinate2D?
@@ -39,6 +43,9 @@ struct MapTabView: View {
     /// 圈地开始时间（用于记录）
     @State private var trackingStartTime: Date?
 
+    /// 已加载的领地列表
+    @State private var territories: [Territory] = []
+
     /// 领地管理器
     private let territoryManager = TerritoryManager.shared
 
@@ -46,7 +53,7 @@ struct MapTabView: View {
 
     var body: some View {
         ZStack {
-            // 地图视图（添加轨迹相关参数）
+            // 地图视图（添加轨迹相关参数和领地显示）
             MapViewRepresentable(
                 userLocation: $userLocation,
                 hasLocatedUser: $hasLocatedUser,
@@ -54,7 +61,9 @@ struct MapTabView: View {
                 trackingPath: $locationManager.pathCoordinates,
                 pathUpdateVersion: locationManager.pathUpdateVersion,
                 isTracking: locationManager.isTracking,
-                isPathClosed: locationManager.isPathClosed
+                isPathClosed: locationManager.isPathClosed,
+                territories: territories,
+                currentUserId: authManager.currentUser?.id.uuidString
             )
             .ignoresSafeArea()
 
@@ -121,6 +130,10 @@ struct MapTabView: View {
         }
         .onAppear {
             setupLocation()
+            // 加载已有领地
+            Task {
+                await loadTerritories()
+            }
         }
         // 监听闭环状态，闭环后根据验证结果显示横幅
         .onReceive(locationManager.$isPathClosed) { isClosed in
@@ -525,6 +538,20 @@ struct MapTabView: View {
         }
     }
 
+    /// 加载所有领地
+    private func loadTerritories() async {
+        print("🗺️ [地图页] 开始加载领地...")
+
+        do {
+            territories = try await territoryManager.loadAllTerritories()
+            TerritoryLogger.shared.log("加载了 \(territories.count) 个领地", type: .info)
+            print("✅ [地图页] 领地加载完成，共 \(territories.count) 个")
+        } catch {
+            TerritoryLogger.shared.log("加载领地失败: \(error.localizedDescription)", type: .error)
+            print("❌ [地图页] 领地加载失败: \(error.localizedDescription)")
+        }
+    }
+
     /// 重新居中到用户位置
     private func recenterToUser() {
         guard let location = userLocation else {
@@ -602,6 +629,9 @@ struct MapTabView: View {
             showUploadSuccess("领地登记成功！")
             TerritoryLogger.shared.log("领地登记成功！", type: .success)
             print("✅ [地图页] 领地上传成功")
+
+            // 刷新领地列表，显示新上传的领地
+            await loadTerritories()
 
             // 3秒后清除路径和状态
             DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
