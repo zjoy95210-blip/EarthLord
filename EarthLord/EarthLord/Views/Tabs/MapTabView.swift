@@ -27,6 +27,21 @@ struct MapTabView: View {
     /// 是否显示验证结果横幅
     @State private var showValidationBanner: Bool = false
 
+    /// 是否正在上传领地
+    @State private var isUploading: Bool = false
+
+    /// 上传结果提示
+    @State private var uploadResultMessage: String?
+
+    /// 是否显示上传结果
+    @State private var showUploadResult: Bool = false
+
+    /// 圈地开始时间（用于记录）
+    @State private var trackingStartTime: Date?
+
+    /// 领地管理器
+    private let territoryManager = TerritoryManager.shared
+
     // MARK: - Body
 
     var body: some View {
@@ -78,12 +93,26 @@ struct MapTabView: View {
                         .transition(.scale.combined(with: .opacity))
                 }
 
+                // 上传结果提示
+                if showUploadResult, let message = uploadResultMessage {
+                    uploadResultBanner(message: message)
+                        .transition(.scale.combined(with: .opacity))
+                }
+
+                // 确认登记按钮（验证通过时显示）
+                if locationManager.territoryValidationPassed && !isUploading {
+                    confirmUploadButton
+                        .transition(.scale.combined(with: .opacity))
+                }
+
                 // 底部控制栏
                 bottomControlBar
             }
             .padding()
             .animation(.easeInOut(duration: 0.3), value: locationManager.speedWarning != nil)
             .animation(.spring(response: 0.5, dampingFraction: 0.7), value: showValidationBanner)
+            .animation(.spring(response: 0.5, dampingFraction: 0.7), value: locationManager.territoryValidationPassed)
+            .animation(.spring(response: 0.5, dampingFraction: 0.7), value: showUploadResult)
 
             // 权限拒绝提示
             if locationManager.isDenied {
@@ -179,6 +208,67 @@ struct MapTabView: View {
                 .fill(locationManager.territoryValidationPassed ? Color.green : Color.red)
         )
         .shadow(color: (locationManager.territoryValidationPassed ? Color.green : Color.red).opacity(0.4),
+                radius: 8, x: 0, y: 4)
+        .padding(.bottom, 10)
+    }
+
+    // MARK: - 确认登记按钮
+
+    /// 确认登记领地按钮
+    private var confirmUploadButton: some View {
+        Button {
+            Task {
+                await uploadCurrentTerritory()
+            }
+        } label: {
+            HStack(spacing: 8) {
+                if isUploading {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .scaleEffect(0.8)
+                } else {
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                }
+
+                Text(isUploading ? "正在登记..." : "确认登记领地")
+                    .font(.system(size: 14, weight: .semibold))
+            }
+            .foregroundColor(.white)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.green)
+            )
+            .shadow(color: Color.green.opacity(0.4), radius: 8, x: 0, y: 4)
+        }
+        .disabled(isUploading)
+        .padding(.bottom, 10)
+    }
+
+    // MARK: - 上传结果横幅
+
+    /// 上传结果横幅
+    private func uploadResultBanner(message: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: message.contains("成功") ? "checkmark.circle.fill" : "xmark.circle.fill")
+                .font(.body)
+
+            Text(message)
+                .font(.subheadline)
+                .fontWeight(.medium)
+        }
+        .foregroundColor(.white)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(message.contains("成功") ? Color.green : Color.red)
+        )
+        .shadow(color: (message.contains("成功") ? Color.green : Color.red).opacity(0.4),
                 radius: 8, x: 0, y: 4)
         .padding(.bottom, 10)
     }
@@ -459,8 +549,10 @@ struct MapTabView: View {
     private func toggleTracking() {
         if locationManager.isPathClosed {
             // 已闭合，重新开始
+            resetUploadState()
             locationManager.clearPath()
             locationManager.startPathTracking()
+            trackingStartTime = Date()  // 记录开始时间
             print("🔄 [地图页] 重新开始圈地")
         } else if locationManager.isTracking {
             // 停止追踪
@@ -468,9 +560,108 @@ struct MapTabView: View {
             print("🛑 [地图页] 停止圈地")
         } else {
             // 开始追踪
+            resetUploadState()
+            locationManager.clearPath()  // 确保清除之前的路径
             locationManager.startPathTracking()
-            print("🚶 [地图页] 开始圈地")
+            trackingStartTime = Date()  // 记录开始时间
+            print("🚶 [地图页] 开始圈地，开始时间: \(trackingStartTime!)")
         }
+    }
+
+    // MARK: - 上传领地
+
+    /// 上传当前领地到服务器
+    private func uploadCurrentTerritory() async {
+        // 验证是否通过
+        guard locationManager.territoryValidationPassed else {
+            showUploadError("领地验证未通过，无法上传")
+            return
+        }
+
+        // 获取坐标
+        let coordinates = locationManager.pathCoordinates
+        guard coordinates.count >= 3 else {
+            showUploadError("坐标点不足，无法上传")
+            return
+        }
+
+        // 开始上传
+        isUploading = true
+        TerritoryLogger.shared.log("开始上传领地...", type: .info)
+        print("🏴 [地图页] 开始上传领地，坐标点数: \(coordinates.count)")
+
+        do {
+            try await territoryManager.uploadTerritory(
+                coordinates: coordinates,
+                area: locationManager.calculatedArea,
+                startTime: trackingStartTime ?? Date()
+            )
+
+            // 上传成功
+            isUploading = false
+            showUploadSuccess("领地登记成功！")
+            TerritoryLogger.shared.log("领地登记成功！", type: .success)
+            print("✅ [地图页] 领地上传成功")
+
+            // 3秒后清除路径和状态
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                self.resetAfterUpload()
+            }
+
+        } catch {
+            // 上传失败
+            isUploading = false
+            let errorMessage = "上传失败: \(error.localizedDescription)"
+            showUploadError(errorMessage)
+            TerritoryLogger.shared.log(errorMessage, type: .error)
+            print("❌ [地图页] \(errorMessage)")
+        }
+    }
+
+    /// 显示上传成功提示
+    private func showUploadSuccess(_ message: String) {
+        uploadResultMessage = message
+        withAnimation {
+            showUploadResult = true
+        }
+
+        // 5秒后隐藏
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+            withAnimation {
+                showUploadResult = false
+            }
+        }
+    }
+
+    /// 显示上传错误提示
+    private func showUploadError(_ message: String) {
+        uploadResultMessage = message
+        withAnimation {
+            showUploadResult = true
+        }
+
+        // 5秒后隐藏
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+            withAnimation {
+                showUploadResult = false
+            }
+        }
+    }
+
+    /// 重置上传相关状态
+    private func resetUploadState() {
+        isUploading = false
+        uploadResultMessage = nil
+        showUploadResult = false
+        showValidationBanner = false
+    }
+
+    /// 上传成功后重置所有状态
+    private func resetAfterUpload() {
+        locationManager.clearPath()
+        resetUploadState()
+        trackingStartTime = nil
+        print("🔄 [地图页] 上传成功后重置状态")
     }
 }
 

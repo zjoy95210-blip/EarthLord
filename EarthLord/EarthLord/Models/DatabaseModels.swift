@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import CoreLocation
 
 // MARK: - Profile (用户资料)
 /// 对应 profiles 表
@@ -28,10 +29,14 @@ struct Profile: Codable, Identifiable, Sendable {
 struct Territory: Codable, Identifiable, Sendable {
     let id: UUID
     let userId: UUID
-    var name: String
-    var path: [Coordinate]  // JSONB 路径点数组
-    var area: Double        // 面积（平方米）
-    let createdAt: Date
+    var name: String?                    // ⚠️ 可选，数据库允许为空
+    var path: [[String: Double]]         // 格式：[{"lat": x, "lon": y}]
+    var area: Double                     // 面积（平方米）
+    let pointCount: Int?                 // 路径点数量
+    let isActive: Bool?                  // 是否有效
+    let startedAt: Date?                 // 开始圈地时间
+    let completedAt: Date?               // 完成圈地时间
+    let createdAt: Date?                 // 创建时间
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -39,7 +44,19 @@ struct Territory: Codable, Identifiable, Sendable {
         case name
         case path
         case area
+        case pointCount = "point_count"
+        case isActive = "is_active"
+        case startedAt = "started_at"
+        case completedAt = "completed_at"
         case createdAt = "created_at"
+    }
+
+    /// 将 path 转换为 CLLocationCoordinate2D 数组
+    func toCoordinates() -> [CLLocationCoordinate2D] {
+        return path.compactMap { point in
+            guard let lat = point["lat"], let lon = point["lon"] else { return nil }
+            return CLLocationCoordinate2D(latitude: lat, longitude: lon)
+        }
     }
 }
 
@@ -130,15 +147,31 @@ enum POIType: String, Codable, CaseIterable, Sendable {
 /// 创建新领地时使用的模型
 struct TerritoryInsert: Codable, Sendable {
     let userId: UUID
-    let name: String
-    let path: [Coordinate]
+    let path: [[String: Double]]         // [{"lat": x, "lon": y}]
+    let polygon: String                   // WKT 格式
+    let bboxMinLat: Double
+    let bboxMaxLat: Double
+    let bboxMinLon: Double
+    let bboxMaxLon: Double
     let area: Double
+    let pointCount: Int
+    let startedAt: String                 // ISO8601 格式
+    let completedAt: String               // ISO8601 格式
+    let isActive: Bool
 
     enum CodingKeys: String, CodingKey {
         case userId = "user_id"
-        case name
         case path
+        case polygon
+        case bboxMinLat = "bbox_min_lat"
+        case bboxMaxLat = "bbox_max_lat"
+        case bboxMinLon = "bbox_min_lon"
+        case bboxMaxLon = "bbox_max_lon"
         case area
+        case pointCount = "point_count"
+        case startedAt = "started_at"
+        case completedAt = "completed_at"
+        case isActive = "is_active"
     }
 }
 
