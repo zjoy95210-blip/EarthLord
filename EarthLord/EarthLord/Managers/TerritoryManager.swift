@@ -206,6 +206,7 @@ final class TerritoryManager: ObservableObject {
                 .select()
                 .eq("user_id", value: userId.uuidString)
                 .eq("is_active", value: true)
+                .order("created_at", ascending: false)
                 .execute()
                 .value
 
@@ -215,6 +216,53 @@ final class TerritoryManager: ObservableObject {
         } catch {
             print("❌ [领地] 加载失败: \(error.localizedDescription)")
             throw TerritoryError.loadFailed(error.localizedDescription)
+        }
+    }
+
+    // MARK: - 删除领地
+
+    /// 删除领地（软删除，设置 is_active = false）
+    /// - Parameter territoryId: 领地 ID
+    /// - Returns: 是否删除成功
+    func deleteTerritory(territoryId: UUID) async -> Bool {
+        print("🗑️ [领地] 开始删除领地: \(territoryId)")
+
+        do {
+            // 软删除：将 is_active 设为 false
+            try await supabase
+                .from("territories")
+                .update(["is_active": false])
+                .eq("id", value: territoryId.uuidString)
+                .execute()
+
+            print("✅ [领地] 领地删除成功")
+            return true
+
+        } catch {
+            print("❌ [领地] 删除失败: \(error.localizedDescription)")
+            return false
+        }
+    }
+
+    /// 硬删除领地（从数据库中彻底删除）
+    /// - Parameter territoryId: 领地 ID
+    /// - Returns: 是否删除成功
+    func hardDeleteTerritory(territoryId: UUID) async -> Bool {
+        print("🗑️ [领地] 开始硬删除领地: \(territoryId)")
+
+        do {
+            try await supabase
+                .from("territories")
+                .delete()
+                .eq("id", value: territoryId.uuidString)
+                .execute()
+
+            print("✅ [领地] 领地硬删除成功")
+            return true
+
+        } catch {
+            print("❌ [领地] 硬删除失败: \(error.localizedDescription)")
+            return false
         }
     }
 }

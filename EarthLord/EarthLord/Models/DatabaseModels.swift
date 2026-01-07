@@ -58,6 +58,47 @@ struct Territory: Codable, Identifiable, Sendable {
             return CLLocationCoordinate2D(latitude: lat, longitude: lon)
         }
     }
+
+    // MARK: - 辅助属性
+
+    /// 格式化面积显示
+    var formattedArea: String {
+        if area >= 1_000_000 {
+            return String(format: "%.2f km²", area / 1_000_000)
+        } else if area >= 10_000 {
+            return String(format: "%.2f 万m²", area / 10_000)
+        } else {
+            return String(format: "%.0f m²", area)
+        }
+    }
+
+    /// 显示名称（如果没有名称则显示默认）
+    var displayName: String {
+        return name ?? "未命名领地"
+    }
+
+    /// 格式化创建时间
+    var formattedCreatedAt: String {
+        guard let date = createdAt else { return "未知时间" }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm"
+        return formatter.string(from: date)
+    }
+
+    /// 格式化圈地时长
+    var formattedDuration: String {
+        guard let start = startedAt, let end = completedAt else {
+            return "未知"
+        }
+        let duration = end.timeIntervalSince(start)
+        let minutes = Int(duration) / 60
+        let seconds = Int(duration) % 60
+        if minutes > 0 {
+            return "\(minutes)分\(seconds)秒"
+        } else {
+            return "\(seconds)秒"
+        }
+    }
 }
 
 // MARK: - Coordinate (坐标点)
