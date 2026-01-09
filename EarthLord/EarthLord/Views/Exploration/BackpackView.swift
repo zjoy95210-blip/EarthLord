@@ -377,26 +377,52 @@ struct BackpackView: View {
     /// 空状态视图
     private var emptyStateView: some View {
         VStack(spacing: 16) {
-            Image(systemName: "bag")
-                .font(.system(size: 48))
-                .foregroundColor(ApocalypseTheme.textMuted)
+            // 根据情况显示不同的空状态
+            if backpackItems.isEmpty {
+                // 背包完全为空的情况
+                Image(systemName: "bag")
+                    .font(.system(size: 60))
+                    .foregroundColor(ApocalypseTheme.textMuted)
 
-            Text("没有找到物品")
-                .font(.system(size: 16))
-                .foregroundColor(ApocalypseTheme.textSecondary)
+                Text("背包空空如也")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(ApocalypseTheme.textSecondary)
 
-            if !searchText.isEmpty {
+                Text("去探索收集物资吧")
+                    .font(.system(size: 14))
+                    .foregroundColor(ApocalypseTheme.textMuted)
+
+            } else if !searchText.isEmpty {
+                // 搜索没有结果的情况
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 60))
+                    .foregroundColor(ApocalypseTheme.textMuted)
+
+                Text("没有找到相关物品")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(ApocalypseTheme.textSecondary)
+
                 Text("尝试其他搜索词")
                     .font(.system(size: 14))
                     .foregroundColor(ApocalypseTheme.textMuted)
+
             } else {
+                // 分类筛选没有结果的情况
+                Image(systemName: "tray")
+                    .font(.system(size: 60))
+                    .foregroundColor(ApocalypseTheme.textMuted)
+
                 Text("该分类下暂无物品")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(ApocalypseTheme.textSecondary)
+
+                Text("切换其他分类查看")
                     .font(.system(size: 14))
                     .foregroundColor(ApocalypseTheme.textMuted)
             }
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 60)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.vertical, 80)
     }
 }
 

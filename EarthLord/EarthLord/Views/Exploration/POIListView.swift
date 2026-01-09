@@ -277,20 +277,37 @@ struct POIListView: View {
     /// 空状态视图
     private var emptyStateView: some View {
         VStack(spacing: 16) {
-            Image(systemName: "mappin.slash")
-                .font(.system(size: 48))
-                .foregroundColor(ApocalypseTheme.textMuted)
+            // 根据情况显示不同的空状态
+            if poiList.isEmpty {
+                // 完全没有POI的情况
+                Image(systemName: "map")
+                    .font(.system(size: 60))
+                    .foregroundColor(ApocalypseTheme.textMuted)
 
-            Text("未发现该类型的地点")
-                .font(.system(size: 16))
-                .foregroundColor(ApocalypseTheme.textSecondary)
+                Text("附近暂无兴趣点")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(ApocalypseTheme.textSecondary)
 
-            Text("尝试搜索或切换其他分类")
-                .font(.system(size: 14))
-                .foregroundColor(ApocalypseTheme.textMuted)
+                Text("点击搜索按钮发现周围的废墟")
+                    .font(.system(size: 14))
+                    .foregroundColor(ApocalypseTheme.textMuted)
+            } else {
+                // 筛选后没有结果的情况
+                Image(systemName: "mappin.slash")
+                    .font(.system(size: 60))
+                    .foregroundColor(ApocalypseTheme.textMuted)
+
+                Text("没有找到该类型的地点")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(ApocalypseTheme.textSecondary)
+
+                Text("尝试切换其他分类查看")
+                    .font(.system(size: 14))
+                    .foregroundColor(ApocalypseTheme.textMuted)
+            }
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 60)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.vertical, 80)
     }
 
     // MARK: - Actions

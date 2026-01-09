@@ -12,8 +12,14 @@ struct ExplorationResultView: View {
 
     // MARK: - Properties
 
-    /// 探索结果数据
-    let result: ExplorationResult
+    /// 探索结果数据（成功时有值）
+    let result: ExplorationResult?
+
+    /// 错误信息（失败时有值）
+    let errorMessage: String?
+
+    /// 重试回调
+    var onRetry: (() -> Void)?
 
     /// 环境变量用于关闭页面
     @Environment(\.dismiss) private var dismiss
@@ -35,6 +41,22 @@ struct ExplorationResultView: View {
     /// 对勾图标弹跳状态
     @State private var checkmarkBounced: Set<Int> = []
 
+    // MARK: - 便捷初始化器
+
+    /// 成功结果初始化
+    init(result: ExplorationResult) {
+        self.result = result
+        self.errorMessage = nil
+        self.onRetry = nil
+    }
+
+    /// 错误状态初始化
+    init(errorMessage: String, onRetry: @escaping () -> Void) {
+        self.result = nil
+        self.errorMessage = errorMessage
+        self.onRetry = onRetry
+    }
+
     // MARK: - Body
 
     var body: some View {
@@ -43,36 +65,138 @@ struct ExplorationResultView: View {
             ApocalypseTheme.background
                 .ignoresSafeArea()
 
-            ScrollView {
-                VStack(spacing: 24) {
-                    // 成就标题
-                    achievementHeader
-                        .opacity(showContent ? 1 : 0)
-                        .scaleEffect(showContent ? 1 : 0.8)
-
-                    // 统计数据卡片
-                    statisticsCard
-                        .opacity(showStats ? 1 : 0)
-                        .offset(y: showStats ? 0 : 20)
-
-                    // 奖励物品卡片
-                    rewardsCard
-                        .opacity(showRewards ? 1 : 0)
-                        .offset(y: showRewards ? 0 : 20)
-
-                    // 确认按钮
-                    confirmButton
-                        .opacity(showButton ? 1 : 0)
-                        .scaleEffect(showButton ? 1 : 0.9)
-
-                    Spacer(minLength: 40)
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 40)
+            // 根据状态显示不同内容
+            if let errorMessage = errorMessage {
+                // 错误状态
+                errorStateView(message: errorMessage)
+            } else if let result = result {
+                // 成功状态
+                successStateView(result: result)
             }
         }
         .onAppear {
-            startAnimations()
+            if result != nil {
+                startAnimations()
+            } else {
+                // 错误状态直接显示
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                    showContent = true
+                    showButton = true
+                }
+            }
+        }
+    }
+
+    // MARK: - 成功状态视图
+
+    private func successStateView(result: ExplorationResult) -> some View {
+        ScrollView {
+            VStack(spacing: 24) {
+                // 成就标题
+                achievementHeader
+                    .opacity(showContent ? 1 : 0)
+                    .scaleEffect(showContent ? 1 : 0.8)
+
+                // 统计数据卡片
+                statisticsCard
+                    .opacity(showStats ? 1 : 0)
+                    .offset(y: showStats ? 0 : 20)
+
+                // 奖励物品卡片
+                rewardsCard
+                    .opacity(showRewards ? 1 : 0)
+                    .offset(y: showRewards ? 0 : 20)
+
+                // 确认按钮
+                confirmButton
+                    .opacity(showButton ? 1 : 0)
+                    .scaleEffect(showButton ? 1 : 0.9)
+
+                Spacer(minLength: 40)
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 40)
+        }
+    }
+
+    // MARK: - 错误状态视图
+
+    private func errorStateView(message: String) -> some View {
+        VStack(spacing: 20) {
+            Spacer()
+
+            // 错误图标
+            ZStack {
+                Circle()
+                    .fill(ApocalypseTheme.danger.opacity(0.15))
+                    .frame(width: 100, height: 100)
+
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 60))
+                    .foregroundColor(ApocalypseTheme.danger)
+            }
+            .opacity(showContent ? 1 : 0)
+            .scaleEffect(showContent ? 1 : 0.5)
+
+            // 错误标题
+            Text("探索失败")
+                .font(.system(size: 22, weight: .bold))
+                .foregroundColor(ApocalypseTheme.textPrimary)
+                .opacity(showContent ? 1 : 0)
+
+            // 错误信息
+            Text(message)
+                .font(.system(size: 15))
+                .foregroundColor(ApocalypseTheme.textSecondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
+                .opacity(showContent ? 1 : 0)
+
+            Spacer()
+
+            // 按钮区域
+            VStack(spacing: 12) {
+                // 重试按钮
+                if let onRetry = onRetry {
+                    Button {
+                        onRetry()
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 16, weight: .semibold))
+
+                            Text("重新探索")
+                                .font(.system(size: 16, weight: .semibold))
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(ApocalypseTheme.primary)
+                        )
+                    }
+                }
+
+                // 关闭按钮
+                Button {
+                    dismiss()
+                } label: {
+                    Text("返回")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(ApocalypseTheme.textSecondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(ApocalypseTheme.textMuted.opacity(0.5), lineWidth: 1)
+                        )
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 40)
+            .opacity(showButton ? 1 : 0)
+            .offset(y: showButton ? 0 : 20)
         }
     }
 
@@ -109,6 +233,8 @@ struct ExplorationResultView: View {
 
     /// 统计数字跳动动画
     private func startNumberCountingAnimation() {
+        guard let result = result else { return }
+
         // 距离数字动画（0.6秒完成）
         withAnimation(.easeOut(duration: 0.6)) {
             animatedDistance = result.sessionDistance
@@ -127,6 +253,8 @@ struct ExplorationResultView: View {
 
     /// 奖励物品依次出现动画
     private func startRewardItemsAnimation() {
+        guard let result = result else { return }
+
         for index in result.obtainedItems.indices {
             // 错开 0.2 秒依次出现
             let delay = Double(index) * 0.2
@@ -218,8 +346,8 @@ struct ExplorationResultView: View {
                 iconColor: Color(hex: "4CAF50"),
                 title: "行走距离",
                 sessionValue: formatDistance(animatedDistance),
-                totalValue: formatDistance(result.totalDistance),
-                rank: result.distanceRank
+                totalValue: formatDistance(result?.totalDistance ?? 0),
+                rank: result?.distanceRank ?? 0
             )
 
             // 探索面积
@@ -228,8 +356,8 @@ struct ExplorationResultView: View {
                 iconColor: Color(hex: "2196F3"),
                 title: "探索面积",
                 sessionValue: formatArea(animatedArea),
-                totalValue: formatArea(result.totalArea),
-                rank: result.areaRank
+                totalValue: formatArea(result?.totalArea ?? 0),
+                rank: result?.areaRank ?? 0
             )
 
             // 探索时长
@@ -391,7 +519,7 @@ struct ExplorationResultView: View {
                 Spacer()
 
                 // 物品数量
-                Text("\(result.obtainedItems.count) 种")
+                Text("\(result?.obtainedItems.count ?? 0) 种")
                     .font(.system(size: 13))
                     .foregroundColor(ApocalypseTheme.textSecondary)
             }
@@ -403,7 +531,7 @@ struct ExplorationResultView: View {
 
             // 物品列表
             VStack(spacing: 12) {
-                ForEach(Array(result.obtainedItems.enumerated()), id: \.element.id) { index, item in
+                ForEach(Array((result?.obtainedItems ?? []).enumerated()), id: \.element.id) { index, item in
                     rewardItemRow(item: item, index: index)
                         .opacity(visibleRewardIndices.contains(index) ? 1 : 0)
                         .offset(x: visibleRewardIndices.contains(index) ? 0 : -30)
