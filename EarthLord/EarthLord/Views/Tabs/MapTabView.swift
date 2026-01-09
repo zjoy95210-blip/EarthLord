@@ -53,6 +53,12 @@ struct MapTabView: View {
     @State private var showCollisionWarning = false
     @State private var collisionWarningLevel: WarningLevel = .safe
 
+    // MARK: - 探索功能状态
+    /// 是否正在探索（显示加载状态）
+    @State private var isExploring: Bool = false
+    /// 是否显示探索结果 sheet
+    @State private var showExplorationResult: Bool = false
+
     /// 领地管理器
     private let territoryManager = TerritoryManager.shared
 
@@ -141,6 +147,9 @@ struct MapTabView: View {
             }
         }
         .animation(.easeInOut(duration: 0.3), value: showCollisionWarning)
+        .sheet(isPresented: $showExplorationResult) {
+            ExplorationResultView(result: MockExplorationData.sampleExplorationResult)
+        }
         .onAppear {
             setupLocation()
             // 加载已有领地
@@ -389,13 +398,13 @@ struct MapTabView: View {
     // MARK: - 底部控制栏
 
     private var bottomControlBar: some View {
-        HStack(alignment: .bottom) {
-            // 圈地按钮
+        HStack(alignment: .bottom, spacing: 12) {
+            // 左侧：圈地按钮
             trackingButton
 
             Spacer()
 
-            // 定位按钮
+            // 中间：定位按钮
             Button {
                 recenterToUser()
             } label: {
@@ -410,6 +419,11 @@ struct MapTabView: View {
                 }
             }
             .shadow(color: .black.opacity(0.3), radius: 5, x: 0, y: 2)
+
+            Spacer()
+
+            // 右侧：探索按钮
+            exploreButton
         }
         .padding(.bottom, 20)
     }
@@ -476,6 +490,59 @@ struct MapTabView: View {
             return .red
         } else {
             return ApocalypseTheme.primary
+        }
+    }
+
+    // MARK: - 探索按钮
+
+    private var exploreButton: some View {
+        Button {
+            startExploration()
+        } label: {
+            HStack(spacing: 8) {
+                if isExploring {
+                    // 加载状态
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .scaleEffect(0.8)
+
+                    Text("探索中...")
+                        .font(.system(size: 14, weight: .semibold))
+                } else {
+                    // 正常状态
+                    Image(systemName: "binoculars.fill")
+                        .font(.system(size: 16, weight: .semibold))
+
+                    Text("探索")
+                        .font(.system(size: 14, weight: .semibold))
+                }
+            }
+            .foregroundColor(.white)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(
+                Capsule()
+                    .fill(isExploring ? ApocalypseTheme.textMuted : ApocalypseTheme.primary)
+            )
+            .shadow(color: (isExploring ? ApocalypseTheme.textMuted : ApocalypseTheme.primary).opacity(0.4),
+                    radius: 8, x: 0, y: 4)
+        }
+        .disabled(isExploring)
+        .animation(.easeInOut(duration: 0.2), value: isExploring)
+    }
+
+    /// 开始探索
+    private func startExploration() {
+        guard !isExploring else { return }
+
+        isExploring = true
+        print("🔍 [地图页] 开始探索...")
+
+        // 模拟 1.5 秒的搜索过程
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            isExploring = false
+            showExplorationResult = true
+            print("✅ [地图页] 探索完成，显示结果")
         }
     }
 
