@@ -18,8 +18,8 @@ struct BackpackView: View {
     /// 当前选中的分类
     @State private var selectedCategory: String = "all"
 
-    /// 背包物品列表
-    @State private var backpackItems: [BackpackItem] = MockExplorationData.backpackItems
+    /// 背包管理器
+    @State private var inventoryManager = InventoryManager.shared
 
     /// 已显示的物品 ID 集合（用于动画）
     @State private var visibleItems: Set<UUID> = []
@@ -27,26 +27,24 @@ struct BackpackView: View {
     /// 动画容量值（用于数字跳动效果）
     @State private var animatedCapacity: Double = 0
 
+    /// 是否正在加载
+    @State private var isLoading: Bool = true
+
     // MARK: - 常量
 
     /// 背包最大容量
-    private let maxCapacity: Double = 100.0
+    private var maxCapacity: Double {
+        inventoryManager.maxCapacity
+    }
 
-    /// 当前使用容量（模拟值）
+    /// 当前使用容量
     private var usedCapacity: Double {
-        // 计算实际重量作为容量
-        var total: Double = 0
-        for item in backpackItems {
-            if let definition = MockExplorationData.getItemDefinition(by: item.itemId) {
-                total += definition.weight * Double(item.quantity)
-            }
-        }
-        return total
+        inventoryManager.totalWeight
     }
 
     /// 容量使用百分比
     private var capacityPercentage: Double {
-        return min(usedCapacity / maxCapacity, 1.0)
+        inventoryManager.capacityPercentage
     }
 
     /// 分类列表
@@ -62,13 +60,13 @@ struct BackpackView: View {
     // MARK: - 计算属性
 
     /// 筛选后的物品列表
-    private var filteredItems: [BackpackItem] {
-        var items = backpackItems
+    private var filteredItems: [DBInventoryItem] {
+        var items = inventoryManager.items
 
         // 按分类筛选
         if selectedCategory != "all" {
             items = items.filter { item in
-                if let definition = MockExplorationData.getItemDefinition(by: item.itemId) {
+                if let definition = inventoryManager.getItemDefinition(id: item.itemId) {
                     return definition.category.rawValue == selectedCategory
                 }
                 return false
@@ -78,7 +76,7 @@ struct BackpackView: View {
         // 按搜索文字筛选
         if !searchText.isEmpty {
             items = items.filter { item in
-                if let definition = MockExplorationData.getItemDefinition(by: item.itemId) {
+                if let definition = inventoryManager.getItemDefinition(id: item.itemId) {
                     return definition.name.localizedCaseInsensitiveContains(searchText)
                 }
                 return false
@@ -90,7 +88,7 @@ struct BackpackView: View {
 
     /// 物品总数量
     private var totalItemCount: Int {
-        backpackItems.reduce(0) { $0 + $1.quantity }
+        inventoryManager.totalItemCount
     }
 
     // MARK: - Body
@@ -101,23 +99,118 @@ struct BackpackView: View {
             ApocalypseTheme.background
                 .ignoresSafeArea()
 
-            VStack(spacing: 0) {
-                // 容量状态卡
-                capacityCard
-                    .padding(.horizontal, 16)
-                    .padding(.top, 12)
+            if isLoading {
+                // 加载状态
+                loadingView
+            } else if let error = inventoryManager.errorMessage {
+                // 错误状态
+                errorView(message: error)
+            } else {
+                VStack(spacing: 0) {
+                    // 容量状态卡
+                    capacityCard
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
 
-                // 搜索和筛选
-                searchAndFilterSection
-                    .padding(.top, 16)
+                    // 搜索和筛选
+                    searchAndFilterSection
+                        .padding(.top, 16)
 
-                // 物品列表
-                itemListView
-                    .padding(.top, 8)
+                    // 物品列表
+                    itemListView
+                        .padding(.top, 8)
+                }
             }
         }
         .navigationTitle("我的背包")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    Task {
+                        await refreshInventory()
+                    }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 14))
+                        .foregroundColor(ApocalypseTheme.primary)
+                }
+            }
+        }
+        .onAppear {
+            Task {
+                await loadInventory()
+            }
+        }
+    }
+
+    // MARK: - 加载视图
+
+    private var loadingView: some View {
+        VStack(spacing: 16) {
+            ProgressView()
+                .progressViewStyle(CircularProgressViewStyle(tint: ApocalypseTheme.primary))
+                .scaleEffect(1.2)
+
+            Text("加载背包中...")
+                .font(.system(size: 14))
+                .foregroundColor(ApocalypseTheme.textSecondary)
+        }
+    }
+
+    // MARK: - 错误视图
+
+    private func errorView(message: String) -> some View {
+        VStack(spacing: 16) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 50))
+                .foregroundColor(ApocalypseTheme.warning)
+
+            Text("加载失败")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(ApocalypseTheme.textPrimary)
+
+            Text(message)
+                .font(.system(size: 14))
+                .foregroundColor(ApocalypseTheme.textSecondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
+
+            Button {
+                Task {
+                    await loadInventory()
+                }
+            } label: {
+                Text("重试")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 10)
+                    .background(
+                        Capsule()
+                            .fill(ApocalypseTheme.primary)
+                    )
+            }
+        }
+    }
+
+    // MARK: - 加载数据
+
+    private func loadInventory() async {
+        isLoading = true
+        await inventoryManager.loadInventory()
+        isLoading = false
+
+        // 启动动画
+        triggerItemListAnimation()
+        animateCapacity()
+    }
+
+    private func refreshInventory() async {
+        visibleItems.removeAll()
+        await inventoryManager.refresh()
+        triggerItemListAnimation()
+        animateCapacity()
     }
 
     // MARK: - 容量状态卡
@@ -175,7 +268,7 @@ struct BackpackView: View {
 
             // 物品数量统计
             HStack {
-                Text("共 \(backpackItems.count) 种物品")
+                Text("共 \(inventoryManager.itemTypeCount) 种物品")
                     .font(.system(size: 12))
                     .foregroundColor(ApocalypseTheme.textSecondary)
 
@@ -304,10 +397,10 @@ struct BackpackView: View {
     /// 计算某分类的物品数量
     private func countItemsInCategory(_ categoryId: String) -> Int {
         if categoryId == "all" {
-            return backpackItems.count
+            return inventoryManager.items.count
         }
-        return backpackItems.filter { item in
-            if let definition = MockExplorationData.getItemDefinition(by: item.itemId) {
+        return inventoryManager.items.filter { item in
+            if let definition = inventoryManager.getItemDefinition(id: item.itemId) {
                 return definition.category.rawValue == categoryId
             }
             return false
@@ -323,30 +416,34 @@ struct BackpackView: View {
                     emptyStateView
                 } else {
                     ForEach(Array(filteredItems.enumerated()), id: \.element.id) { index, item in
-                        if let definition = MockExplorationData.getItemDefinition(by: item.itemId) {
-                            ItemCardView(item: item, definition: definition)
-                                .opacity(visibleItems.contains(item.id) ? 1 : 0)
-                                .offset(y: visibleItems.contains(item.id) ? 0 : 15)
-                                .onAppear {
-                                    // 错开动画
-                                    let delay = Double(index) * 0.08
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                                        withAnimation(.easeOut(duration: 0.25)) {
-                                            _ = visibleItems.insert(item.id)
-                                        }
+                        if let definition = inventoryManager.getItemDefinition(id: item.itemId) {
+                            DBItemCardView(
+                                item: item,
+                                definition: definition,
+                                onUse: {
+                                    handleUseItem(item: item, definition: definition)
+                                },
+                                onDiscard: {
+                                    handleDiscardItem(item: item, definition: definition)
+                                }
+                            )
+                            .opacity(visibleItems.contains(item.id) ? 1 : 0)
+                            .offset(y: visibleItems.contains(item.id) ? 0 : 15)
+                            .onAppear {
+                                // 错开动画
+                                let delay = Double(index) * 0.08
+                                DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                                    withAnimation(.easeOut(duration: 0.25)) {
+                                        _ = visibleItems.insert(item.id)
                                     }
                                 }
+                            }
                         }
                     }
                 }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
-        }
-        .onAppear {
-            // 初始化动画值
-            triggerItemListAnimation()
-            animateCapacity()
         }
         .onChange(of: selectedCategory) { _, _ in
             // 切换分类时重置动画
@@ -374,11 +471,37 @@ struct BackpackView: View {
         }
     }
 
+    /// 处理使用物品
+    private func handleUseItem(item: DBInventoryItem, definition: DBItemDefinition) {
+        print("🎒 [背包] 使用物品: \(definition.name) x1")
+        Task {
+            do {
+                try await inventoryManager.useItem(inventoryItemId: item.id, quantity: 1)
+                animateCapacity()
+            } catch {
+                print("❌ [背包] 使用物品失败: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    /// 处理丢弃物品
+    private func handleDiscardItem(item: DBInventoryItem, definition: DBItemDefinition) {
+        print("🗑️ [背包] 丢弃物品: \(definition.name) x\(item.quantity)")
+        Task {
+            do {
+                try await inventoryManager.discardItem(inventoryItemId: item.id, quantity: item.quantity)
+                animateCapacity()
+            } catch {
+                print("❌ [背包] 丢弃物品失败: \(error.localizedDescription)")
+            }
+        }
+    }
+
     /// 空状态视图
     private var emptyStateView: some View {
         VStack(spacing: 16) {
             // 根据情况显示不同的空状态
-            if backpackItems.isEmpty {
+            if inventoryManager.items.isEmpty {
                 // 背包完全为空的情况
                 Image(systemName: "bag")
                     .font(.system(size: 60))
@@ -426,12 +549,14 @@ struct BackpackView: View {
     }
 }
 
-// MARK: - 物品卡片视图
+// MARK: - 物品卡片视图（数据库版本）
 
-struct ItemCardView: View {
+struct DBItemCardView: View {
 
-    let item: BackpackItem
-    let definition: ItemDefinition
+    let item: DBInventoryItem
+    let definition: DBItemDefinition
+    let onUse: () -> Void
+    let onDiscard: () -> Void
 
     /// 分类图标
     private var categoryIcon: String {
@@ -540,7 +665,7 @@ struct ItemCardView: View {
             VStack(spacing: 6) {
                 // 使用按钮
                 Button {
-                    handleUse()
+                    onUse()
                 } label: {
                     Text("使用")
                         .font(.system(size: 11, weight: .medium))
@@ -553,11 +678,11 @@ struct ItemCardView: View {
                         )
                 }
 
-                // 存储按钮
+                // 丢弃按钮
                 Button {
-                    handleStore()
+                    onDiscard()
                 } label: {
-                    Text("存储")
+                    Text("丢弃")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundColor(ApocalypseTheme.textSecondary)
                         .padding(.horizontal, 10)
@@ -577,7 +702,7 @@ struct ItemCardView: View {
     }
 
     /// 品质颜色
-    private func qualityColor(_ quality: ItemQuality) -> Color {
+    private func qualityColor(_ quality: DBItemQuality) -> Color {
         switch quality {
         case .broken:
             return Color(hex: "F44336")  // 红色
@@ -590,20 +715,6 @@ struct ItemCardView: View {
         case .pristine:
             return Color(hex: "2196F3")  // 蓝色
         }
-    }
-
-    /// 处理使用
-    private func handleUse() {
-        print("🎒 [背包] 使用物品: \(definition.name) x1")
-        print("   - 剩余数量: \(item.quantity - 1)")
-        // TODO: 实现使用逻辑
-    }
-
-    /// 处理存储
-    private func handleStore() {
-        print("🎒 [背包] 存储物品: \(definition.name) x\(item.quantity)")
-        print("   - 将移入仓库")
-        // TODO: 实现存储逻辑
     }
 }
 

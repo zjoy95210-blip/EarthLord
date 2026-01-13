@@ -209,10 +209,11 @@ struct BackpackItem: Identifiable, Codable {
     }
 }
 
-// MARK: - 探索结果模型
+// MARK: - 探索结果模型（旧版，仅用于 Mock）
 
-/// 探索结果统计
-struct ExplorationResult: Codable {
+/// 探索结果统计（旧版 Mock 数据）
+/// 注意：新的 ExplorationResult 定义在 ExplorationManager.swift 中
+struct MockExplorationResult: Codable {
     // 本次探索数据
     let sessionDistance: Double        // 本次行走距离（米）
     let sessionArea: Double            // 本次探索面积（平方米）
@@ -612,7 +613,7 @@ struct MockExplorationData {
 
     /// 探索结果示例
     /// 模拟一次 30 分钟的探索结果
-    static let sampleExplorationResult = ExplorationResult(
+    static let sampleExplorationResult = MockExplorationResult(
         // 本次探索数据
         sessionDistance: 2500,           // 本次行走 2500 米
         sessionArea: 50000,              // 本次探索 5 万平方米

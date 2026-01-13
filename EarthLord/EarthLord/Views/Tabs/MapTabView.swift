@@ -54,10 +54,14 @@ struct MapTabView: View {
     @State private var collisionWarningLevel: WarningLevel = .safe
 
     // MARK: - 探索功能状态
-    /// 是否正在探索（显示加载状态）
-    @State private var isExploring: Bool = false
+    /// 探索管理器
+    @State private var explorationManager = ExplorationManager.shared
     /// 是否显示探索结果 sheet
     @State private var showExplorationResult: Bool = false
+    /// 探索结果数据
+    @State private var explorationResult: ExplorationResult?
+    /// 探索错误信息
+    @State private var explorationError: String?
 
     /// 领地管理器
     private let territoryManager = TerritoryManager.shared
@@ -101,6 +105,18 @@ struct MapTabView: View {
                 // 速度警告横幅
                 if locationManager.speedWarning != nil {
                     speedWarningBanner
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+
+                // 探索超速警告
+                if explorationManager.isExploring && explorationManager.isOverSpeed {
+                    explorationOverSpeedWarning
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+
+                // 探索状态条
+                if explorationManager.isExploring {
+                    explorationStatusBar
                         .transition(.move(edge: .top).combined(with: .opacity))
                 }
 
@@ -148,7 +164,28 @@ struct MapTabView: View {
         }
         .animation(.easeInOut(duration: 0.3), value: showCollisionWarning)
         .sheet(isPresented: $showExplorationResult) {
-            ExplorationResultView(result: MockExplorationData.sampleExplorationResult)
+            if let result = explorationResult {
+                ExplorationResultView(explorationResult: result)
+            } else if let error = explorationError {
+                ExplorationResultView(errorMessage: error, onRetry: {
+                    showExplorationResult = false
+                    Task {
+                        await startExplorationAsync()
+                    }
+                })
+            }
+        }
+        .animation(.easeInOut(duration: 0.3), value: explorationManager.isExploring)
+        .animation(.easeInOut(duration: 0.3), value: explorationManager.isOverSpeed)
+        // 监听探索状态，处理超速停止
+        .onChange(of: explorationManager.state) { oldValue, newValue in
+            if case .failed(let message) = newValue {
+                // 探索失败（包括超速停止）
+                print("🔔 [地图页] 探索失败状态: \(message)")
+                explorationError = message
+                explorationResult = nil
+                showExplorationResult = true
+            }
         }
         .onAppear {
             setupLocation()
@@ -493,26 +530,224 @@ struct MapTabView: View {
         }
     }
 
+    // MARK: - 探索超速警告
+
+    private var explorationOverSpeedWarning: some View {
+        HStack(spacing: 10) {
+            // 警告图标
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 18, weight: .semibold))
+
+            // 警告文字
+            VStack(alignment: .leading, spacing: 2) {
+                Text("速度过快！")
+                    .font(.system(size: 14, weight: .bold))
+
+                HStack(spacing: 4) {
+                    Text("请减速至20km/h以下")
+                        .font(.system(size: 12))
+
+                    // 倒计时
+                    if explorationManager.overSpeedRemainingSeconds > 0 {
+                        Text("(\(explorationManager.overSpeedRemainingSeconds)秒后停止)")
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                }
+            }
+
+            Spacer()
+
+            // 当前速度显示
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(String(format: "%.0f", explorationManager.currentSpeed))
+                    .font(.system(size: 20, weight: .bold, design: .monospaced))
+                Text("km/h")
+                    .font(.system(size: 10))
+            }
+        }
+        .foregroundColor(.white)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.red)
+        )
+        .shadow(color: Color.red.opacity(0.5), radius: 8, x: 0, y: 4)
+        .padding(.horizontal, 16)
+        .padding(.top, 50)
+    }
+
+    // MARK: - 探索状态条
+
+    private var explorationStatusBar: some View {
+        let statusBarColor = explorationManager.isOverSpeed ? Color.orange : Color.green
+        let tierColor = Color(hex: explorationManager.currentRewardTier.colorHex)
+
+        return VStack(spacing: 8) {
+            // 第一行：距离、时长、速度、结束按钮
+            HStack(spacing: 10) {
+                // 距离
+                HStack(spacing: 4) {
+                    Image(systemName: "figure.walk")
+                        .font(.system(size: 12))
+                    Text(formatDistance(explorationManager.totalDistance))
+                        .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                }
+
+                // 分隔线
+                Rectangle()
+                    .fill(Color.white.opacity(0.3))
+                    .frame(width: 1, height: 14)
+
+                // 时长
+                HStack(spacing: 4) {
+                    Image(systemName: "clock.fill")
+                        .font(.system(size: 12))
+                    Text(formatDuration(explorationManager.duration))
+                        .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                }
+
+                // 分隔线
+                Rectangle()
+                    .fill(Color.white.opacity(0.3))
+                    .frame(width: 1, height: 14)
+
+                // 速度显示
+                HStack(spacing: 2) {
+                    Image(systemName: "speedometer")
+                        .font(.system(size: 10))
+                    Text(String(format: "%.0f", explorationManager.currentSpeed))
+                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                }
+                .foregroundColor(explorationManager.isOverSpeed ? .yellow : .white)
+
+                Spacer()
+
+                // 结束按钮
+                Button {
+                    Task {
+                        await stopExplorationAsync()
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "stop.fill")
+                            .font(.system(size: 10))
+                        Text("结束")
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(
+                        Capsule()
+                            .fill(Color.red.opacity(0.8))
+                    )
+                }
+            }
+
+            // 分隔线
+            Rectangle()
+                .fill(Color.white.opacity(0.2))
+                .frame(height: 1)
+
+            // 第二行：奖励等级和距离下一等级
+            HStack(spacing: 8) {
+                // 当前奖励等级
+                HStack(spacing: 4) {
+                    Image(systemName: explorationManager.currentRewardTier.iconName)
+                        .font(.system(size: 12))
+                        .foregroundColor(tierColor)
+                    Text(explorationManager.currentRewardTier.displayName)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(tierColor)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(
+                    Capsule()
+                        .fill(Color.white.opacity(0.2))
+                )
+
+                // 距离下一等级
+                if let nextTier = explorationManager.nextTierName {
+                    HStack(spacing: 4) {
+                        Text("距\(nextTier)还差")
+                            .font(.system(size: 11))
+                            .foregroundColor(.white.opacity(0.8))
+                        Text(formatDistance(explorationManager.distanceToNextTier))
+                            .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                            .foregroundColor(.yellow)
+                    }
+                } else {
+                    // 已是最高等级
+                    Text("已达最高等级！")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.yellow)
+                }
+
+                Spacer()
+            }
+        }
+        .foregroundColor(.white)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(statusBarColor.opacity(0.9))
+        )
+        .shadow(color: statusBarColor.opacity(0.4), radius: 8, x: 0, y: 4)
+        .padding(.horizontal, 16)
+        .padding(.top, explorationManager.isOverSpeed ? 10 : 50)
+        .animation(.easeInOut(duration: 0.3), value: explorationManager.isOverSpeed)
+        .animation(.easeInOut(duration: 0.3), value: explorationManager.currentRewardTier)
+    }
+
+    /// 格式化距离
+    private func formatDistance(_ meters: Double) -> String {
+        if meters >= 1000 {
+            return String(format: "%.2f km", meters / 1000)
+        } else {
+            return String(format: "%.0f m", meters)
+        }
+    }
+
+    /// 格式化时长
+    private func formatDuration(_ seconds: Int) -> String {
+        let minutes = seconds / 60
+        let secs = seconds % 60
+        return String(format: "%02d:%02d", minutes, secs)
+    }
+
     // MARK: - 探索按钮
 
     private var exploreButton: some View {
         Button {
-            startExploration()
+            Task {
+                if explorationManager.isExploring {
+                    await stopExplorationAsync()
+                } else {
+                    await startExplorationAsync()
+                }
+            }
         } label: {
             HStack(spacing: 8) {
-                if isExploring {
-                    // 加载状态
+                if explorationManager.state == .finishing {
+                    // 结算中
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                         .scaleEffect(0.8)
-
-                    Text("探索中...")
+                    Text("结算中...")
+                        .font(.system(size: 14, weight: .semibold))
+                } else if explorationManager.isExploring {
+                    // 探索中 - 显示停止按钮
+                    Image(systemName: "stop.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                    Text("结束")
                         .font(.system(size: 14, weight: .semibold))
                 } else {
-                    // 正常状态
+                    // 空闲状态
                     Image(systemName: "binoculars.fill")
                         .font(.system(size: 16, weight: .semibold))
-
                     Text("探索")
                         .font(.system(size: 14, weight: .semibold))
                 }
@@ -522,27 +757,51 @@ struct MapTabView: View {
             .padding(.vertical, 12)
             .background(
                 Capsule()
-                    .fill(isExploring ? ApocalypseTheme.textMuted : ApocalypseTheme.primary)
+                    .fill(explorationManager.isExploring ? Color.red : ApocalypseTheme.primary)
             )
-            .shadow(color: (isExploring ? ApocalypseTheme.textMuted : ApocalypseTheme.primary).opacity(0.4),
+            .shadow(color: (explorationManager.isExploring ? Color.red : ApocalypseTheme.primary).opacity(0.4),
                     radius: 8, x: 0, y: 4)
         }
-        .disabled(isExploring)
-        .animation(.easeInOut(duration: 0.2), value: isExploring)
+        .disabled(explorationManager.state == .finishing)
+        .animation(.easeInOut(duration: 0.2), value: explorationManager.isExploring)
     }
 
     /// 开始探索
-    private func startExploration() {
-        guard !isExploring else { return }
+    private func startExplorationAsync() async {
+        print("🔍 [地图页] 开始探索请求...")
+        explorationError = nil
+        explorationResult = nil
 
-        isExploring = true
-        print("🔍 [地图页] 开始探索...")
+        // 如果之前是失败状态，先重置
+        if case .failed = explorationManager.state {
+            print("🔄 [地图页] 重置之前的失败状态")
+            explorationManager.reset()
+        }
 
-        // 模拟 1.5 秒的搜索过程
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            isExploring = false
+        do {
+            try await explorationManager.startExploration()
+            print("✅ [地图页] 探索已开始")
+        } catch {
+            print("❌ [地图页] 开始探索失败: \(error.localizedDescription)")
+            explorationError = error.localizedDescription
             showExplorationResult = true
-            print("✅ [地图页] 探索完成，显示结果")
+        }
+    }
+
+    /// 结束探索
+    private func stopExplorationAsync() async {
+        print("🛑 [地图页] 结束探索...")
+
+        do {
+            let result = try await explorationManager.stopExploration()
+            explorationResult = result
+            explorationError = nil
+            showExplorationResult = true
+            print("✅ [地图页] 探索完成，距离: \(result.formattedDistance)")
+        } catch {
+            print("❌ [地图页] 结束探索失败: \(error.localizedDescription)")
+            explorationError = error.localizedDescription
+            showExplorationResult = true
         }
     }
 

@@ -158,7 +158,18 @@ struct POIDetailView: View {
             // 搜寻后标记为无物资
             isMarkedEmpty = true
         }) {
-            ExplorationResultView(result: MockExplorationData.sampleExplorationResult)
+            // TODO: 替换为真实的探索结果数据
+            ExplorationResultView(explorationResult: ExplorationResult(
+                sessionId: UUID(),
+                distance: 500,
+                duration: 300,
+                rewardTier: .bronze,
+                rewardedItems: [],
+                startCoordinate: nil,
+                endCoordinate: nil,
+                totalDistance: 500,
+                totalDuration: 300
+            ))
         }
     }
 
