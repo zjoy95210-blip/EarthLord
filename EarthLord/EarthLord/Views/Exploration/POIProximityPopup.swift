@@ -81,6 +81,15 @@ struct POIProximityPopup: View {
                                 .font(.system(size: 12, weight: .medium))
                         }
                         .foregroundColor(ApocalypseTheme.success)
+
+                        // 危险等级
+                        HStack(spacing: 4) {
+                            Image(systemName: dangerIcon)
+                                .font(.system(size: 10))
+                            Text(dangerLevel)
+                                .font(.system(size: 12, weight: .medium))
+                        }
+                        .foregroundColor(dangerColor)
                     }
                 }
 
@@ -153,6 +162,62 @@ struct POIProximityPopup: View {
     private func startPulseAnimation() {
         withAnimation(Animation.easeInOut(duration: 1.5).repeatForever(autoreverses: false)) {
             pulseAnimation = true
+        }
+    }
+
+    // MARK: - 危险等级（根据 POI 类型）
+
+    /// 危险等级文字
+    private var dangerLevel: String {
+        switch poi.category {
+        case .hospital, .pharmacy:
+            return "高危"  // 医疗场所可能有感染风险
+        case .supermarket, .convenienceStore:
+            return "中危"  // 人流量大
+        case .gasStation:
+            return "危险"  // 易燃易爆
+        case .restaurant, .cafe:
+            return "低危"
+        case .school, .library:
+            return "安全"
+        case .park:
+            return "安全"
+        case .unknown:
+            return "未知"
+        }
+    }
+
+    /// 危险等级颜色
+    private var dangerColor: Color {
+        switch poi.category {
+        case .hospital, .pharmacy:
+            return .red
+        case .supermarket, .convenienceStore:
+            return .orange
+        case .gasStation:
+            return .red
+        case .restaurant, .cafe:
+            return .yellow
+        case .school, .library, .park:
+            return .green
+        case .unknown:
+            return .gray
+        }
+    }
+
+    /// 危险等级图标
+    private var dangerIcon: String {
+        switch poi.category {
+        case .hospital, .pharmacy, .gasStation:
+            return "exclamationmark.triangle.fill"
+        case .supermarket, .convenienceStore:
+            return "exclamationmark.circle.fill"
+        case .restaurant, .cafe:
+            return "info.circle.fill"
+        case .school, .library, .park:
+            return "checkmark.shield.fill"
+        case .unknown:
+            return "questionmark.circle.fill"
         }
     }
 }

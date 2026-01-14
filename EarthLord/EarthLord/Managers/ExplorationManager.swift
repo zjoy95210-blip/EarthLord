@@ -171,6 +171,9 @@ final class ExplorationManager: NSObject {
     /// 已监控的围栏 ID 列表（最多20个）
     private var monitoredRegionIds: Set<String> = []
 
+    /// 围栏 ID 到 POI ID 的映射
+    private var regionIdToPOIId: [String: String] = [:]
+
     /// 围栏半径（米）
     private let geofenceRadius: CLLocationDistance = 50
 
@@ -410,6 +413,11 @@ final class ExplorationManager: NSObject {
         // 复制 POI 到存储属性（确保 SwiftUI 观察到变化）
         nearbyPOIs = POISearchManager.shared.pois
 
+        // 🧪 调试：添加东边的测试 POI
+        #if DEBUG
+        addTestPOIsToEast(from: coordinate)
+        #endif
+
         // 为 POI 设置地理围栏
         setupGeofences(for: nearbyPOIs)
 
@@ -419,30 +427,101 @@ final class ExplorationManager: NSObject {
         print("📍 [探索] POI 已更新到视图，共 \(nearbyPOIs.count) 个")
     }
 
+    #if DEBUG
+    /// 🧪 调试用：在青年北路位置添加测试 POI
+    private func addTestPOIsToEast(from center: CLLocationCoordinate2D) {
+        // 江苏省泰州市海陵区青年北路附近坐标
+        // 泰州市中心约: 纬度 32.4554, 经度 119.9232
+        // 青年北路在市中心偏北位置
+        let qingnianluLat = 32.4650
+        let qingnianluLng = 119.9230
+
+        let testPOIs: [ScavengePOI] = [
+            ScavengePOI(
+                id: "test_hospital_qingnianlu",
+                name: "🧪 青年北路医院",
+                category: .hospital,
+                coordinate: CLLocationCoordinate2D(
+                    latitude: qingnianluLat,
+                    longitude: qingnianluLng + 0.001
+                ),
+                status: .available,
+                lastScavengedAt: nil,
+                distanceToPlayer: 100
+            ),
+            ScavengePOI(
+                id: "test_supermarket_qingnianlu",
+                name: "🧪 青年北路超市",
+                category: .supermarket,
+                coordinate: CLLocationCoordinate2D(
+                    latitude: qingnianluLat + 0.0005,
+                    longitude: qingnianluLng - 0.0008
+                ),
+                status: .available,
+                lastScavengedAt: nil,
+                distanceToPlayer: 150
+            ),
+            ScavengePOI(
+                id: "test_pharmacy_qingnianlu",
+                name: "🧪 青年北路药店",
+                category: .pharmacy,
+                coordinate: CLLocationCoordinate2D(
+                    latitude: qingnianluLat - 0.0003,
+                    longitude: qingnianluLng + 0.002
+                ),
+                status: .available,
+                lastScavengedAt: nil,
+                distanceToPlayer: 200
+            ),
+            ScavengePOI(
+                id: "test_restaurant_qingnianlu",
+                name: "🧪 青年北路餐厅",
+                category: .restaurant,
+                coordinate: CLLocationCoordinate2D(
+                    latitude: qingnianluLat + 0.001,
+                    longitude: qingnianluLng
+                ),
+                status: .available,
+                lastScavengedAt: nil,
+                distanceToPlayer: 120
+            )
+        ]
+
+        nearbyPOIs.append(contentsOf: testPOIs)
+        print("🧪 [调试] 已添加 \(testPOIs.count) 个青年北路测试 POI（泰州海陵区）")
+    }
+    #endif
+
     /// 设置地理围栏
     private func setupGeofences(for pois: [ScavengePOI]) {
         // 清除旧围栏
         clearAllGeofences()
 
-        // iOS 限制最多同时监控 20 个区域
-        let poisToMonitor = Array(pois.prefix(20))
+        // iOS 限制最多同时监控 20 个区域，保守使用 15 个避免与系统冲突
+        let poisToMonitor = Array(pois.prefix(15))
 
-        for poi in poisToMonitor {
+        for (index, poi) in poisToMonitor.enumerated() {
             // ⚠️ 重要：MapKit 返回的 POI 坐标是 GCJ-02（中国火星坐标）
             // CLLocationManager 用户位置是 WGS-84（GPS 坐标）
             // 地理围栏需要使用 WGS-84 坐标才能正确触发
             let wgs84Coordinate = CoordinateConverter.gcj02ToWgs84(poi.coordinate)
 
+            // 使用简短的 identifier，避免中文和特殊字符导致问题
+            let regionId = "poi_\(index)_\(poi.id.hashValue)"
+
             let region = CLCircularRegion(
                 center: wgs84Coordinate,
                 radius: geofenceRadius,
-                identifier: poi.id
+                identifier: regionId
             )
             region.notifyOnEntry = true
             region.notifyOnExit = false
 
             locationManager?.startMonitoring(for: region)
-            monitoredRegionIds.insert(poi.id)
+            monitoredRegionIds.insert(regionId)
+
+            // 保存 regionId 到 poi.id 的映射
+            regionIdToPOIId[regionId] = poi.id
         }
 
         print("📍 [探索] 已设置 \(poisToMonitor.count) 个地理围栏（已转换为 WGS-84）")
@@ -452,14 +531,16 @@ final class ExplorationManager: NSObject {
     private func clearAllGeofences() {
         guard let manager = locationManager else { return }
 
+        // 清除所有 POI 相关的围栏（以 "poi_" 开头）
         for region in manager.monitoredRegions {
             if let circular = region as? CLCircularRegion,
-               monitoredRegionIds.contains(circular.identifier) {
+               circular.identifier.hasPrefix("poi_") {
                 manager.stopMonitoring(for: region)
             }
         }
 
         monitoredRegionIds.removeAll()
+        regionIdToPOIId.removeAll()
         print("📍 [探索] 已清除所有地理围栏")
     }
 
@@ -477,10 +558,13 @@ final class ExplorationManager: NSObject {
             return
         }
 
+        // 通过映射查找 POI ID
+        let poiId = regionIdToPOIId[identifier] ?? identifier
+
         // 查找对应的 POI
-        guard let poi = nearbyPOIs.first(where: { $0.id == identifier }),
+        guard let poi = nearbyPOIs.first(where: { $0.id == poiId }),
               poi.canScavenge else {
-            print("⚠️ [探索] 进入围栏但 POI 不可搜刮: \(identifier)")
+            print("⚠️ [探索] 进入围栏但 POI 不可搜刮: \(poiId)")
             return
         }
 
