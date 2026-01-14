@@ -328,11 +328,10 @@ struct MapViewRepresentable: UIViewRepresentable {
 
             // 添加新标注
             for poi in pois {
-                // 坐标转换（WGS-84 → GCJ-02）
-                let gcj02Coord = CoordinateConverter.wgs84ToGcj02(poi.coordinate)
-
+                // ⚠️ MapKit 在中国返回的 POI 坐标已经是 GCJ-02，无需转换
+                // 直接使用原始坐标即可正确显示在地图上
                 let annotation = POIAnnotation(poi: poi)
-                annotation.coordinate = gcj02Coord
+                annotation.coordinate = poi.coordinate
                 annotation.title = poi.name
                 annotation.subtitle = "\(poi.category.displayName) · \(poi.formattedDistance)"
 

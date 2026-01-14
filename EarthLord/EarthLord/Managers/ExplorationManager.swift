@@ -428,8 +428,13 @@ final class ExplorationManager: NSObject {
         let poisToMonitor = Array(pois.prefix(20))
 
         for poi in poisToMonitor {
+            // ⚠️ 重要：MapKit 返回的 POI 坐标是 GCJ-02（中国火星坐标）
+            // CLLocationManager 用户位置是 WGS-84（GPS 坐标）
+            // 地理围栏需要使用 WGS-84 坐标才能正确触发
+            let wgs84Coordinate = CoordinateConverter.gcj02ToWgs84(poi.coordinate)
+
             let region = CLCircularRegion(
-                center: poi.coordinate,
+                center: wgs84Coordinate,
                 radius: geofenceRadius,
                 identifier: poi.id
             )
@@ -440,7 +445,7 @@ final class ExplorationManager: NSObject {
             monitoredRegionIds.insert(poi.id)
         }
 
-        print("📍 [探索] 已设置 \(poisToMonitor.count) 个地理围栏")
+        print("📍 [探索] 已设置 \(poisToMonitor.count) 个地理围栏（已转换为 WGS-84）")
     }
 
     /// 清除所有地理围栏
