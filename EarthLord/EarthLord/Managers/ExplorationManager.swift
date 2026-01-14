@@ -100,10 +100,8 @@ final class ExplorationManager: NSObject {
 
     // MARK: - POI 相关属性
 
-    /// 附近 POI 列表（来自 POISearchManager）
-    var nearbyPOIs: [ScavengePOI] {
-        POISearchManager.shared.pois
-    }
+    /// 附近 POI 列表（存储属性，确保 SwiftUI 能观察到变化）
+    var nearbyPOIs: [ScavengePOI] = []
 
     /// 当前接近的 POI（50米内）
     var approachingPOI: ScavengePOI?
@@ -409,11 +407,16 @@ final class ExplorationManager: NSObject {
         print("🔍 [探索] 开始搜索附近 POI...")
         await POISearchManager.shared.searchNearbyPOIs(center: coordinate, forceRefresh: true)
 
+        // 复制 POI 到存储属性（确保 SwiftUI 观察到变化）
+        nearbyPOIs = POISearchManager.shared.pois
+
         // 为 POI 设置地理围栏
-        setupGeofences(for: POISearchManager.shared.pois)
+        setupGeofences(for: nearbyPOIs)
 
         // 触发 UI 更新
         poiUpdateVersion += 1
+
+        print("📍 [探索] POI 已更新到视图，共 \(nearbyPOIs.count) 个")
     }
 
     /// 设置地理围栏
@@ -509,8 +512,14 @@ final class ExplorationManager: NSObject {
             print("🎒 [探索] 搜刮物品已添加到背包，共 \(rewards.count) 种")
         }
 
-        // 标记 POI 为已搜刮
+        // 标记 POI 为已搜刮（同时更新两边）
         POISearchManager.shared.markAsScavenged(poiId: poi.id)
+
+        // 更新本地存储的 POI 状态
+        if let index = nearbyPOIs.firstIndex(where: { $0.id == poi.id }) {
+            nearbyPOIs[index].status = .depleted
+            nearbyPOIs[index].lastScavengedAt = Date()
+        }
 
         // 触发 UI 更新
         poiUpdateVersion += 1
@@ -620,6 +629,7 @@ final class ExplorationManager: NSObject {
         // 重置 POI 相关状态
         clearAllGeofences()
         POISearchManager.shared.clearPOIs()
+        nearbyPOIs = []
         showScavengePopup = false
         popupPOI = nil
         approachingPOI = nil

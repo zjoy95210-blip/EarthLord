@@ -192,7 +192,8 @@ final class POISearchManager {
             let playerCL = CLLocation(latitude: center.latitude, longitude: center.longitude)
 
             let result = response.mapItems.compactMap { mapItem -> ScavengePOI? in
-                guard let location = mapItem.placemark.location else { return nil }
+                // 使用 location 替代已废弃的 placemark.location
+                let location = mapItem.location
 
                 // 计算距离
                 let distance = playerCL.distance(from: location)
@@ -228,8 +229,10 @@ final class POISearchManager {
     private func generatePOIId(mapItem: MKMapItem) -> String {
         // 使用名称+坐标生成唯一ID
         let name = mapItem.name ?? "unknown"
-        let lat = String(format: "%.6f", mapItem.placemark.coordinate.latitude)
-        let lng = String(format: "%.6f", mapItem.placemark.coordinate.longitude)
+        // 使用 location 替代已废弃的 placemark.coordinate
+        let coordinate = mapItem.location.coordinate
+        let lat = String(format: "%.6f", coordinate.latitude)
+        let lng = String(format: "%.6f", coordinate.longitude)
         return "\(name)_\(lat)_\(lng)"
             .replacingOccurrences(of: " ", with: "_")
             .replacingOccurrences(of: "/", with: "_")
