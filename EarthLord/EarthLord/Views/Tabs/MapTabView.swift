@@ -63,6 +63,20 @@ struct MapTabView: View {
     /// 探索错误信息
     @State private var explorationError: String?
 
+    // MARK: - POI 搜刮状态
+    /// 是否显示 POI 搜刮弹窗
+    @State private var showScavengePopup: Bool = false
+    /// 当前弹窗 POI
+    @State private var popupPOI: ScavengePOI?
+    /// 搜刮结果
+    @State private var scavengeResult: [RewardedItem]?
+    /// 搜刮结果对应的 POI
+    @State private var scavengeResultPOI: ScavengePOI?
+    /// 是否正在搜刮
+    @State private var isScavenging: Bool = false
+    /// 是否显示搜刮结果
+    @State private var showScavengeResult: Bool = false
+
     /// 领地管理器
     private let territoryManager = TerritoryManager.shared
 
@@ -80,7 +94,16 @@ struct MapTabView: View {
                 isTracking: locationManager.isTracking,
                 isPathClosed: locationManager.isPathClosed,
                 territories: territories,
-                currentUserId: authManager.currentUser?.id.uuidString
+                currentUserId: authManager.currentUser?.id.uuidString,
+                nearbyPOIs: explorationManager.nearbyPOIs,
+                poiUpdateVersion: explorationManager.poiUpdateVersion,
+                onPOITapped: { poi in
+                    // POI 被点击时显示弹窗
+                    if poi.canScavenge {
+                        popupPOI = poi
+                        showScavengePopup = true
+                    }
+                }
             )
             .ignoresSafeArea()
 
@@ -177,6 +200,46 @@ struct MapTabView: View {
         }
         .animation(.easeInOut(duration: 0.3), value: explorationManager.isExploring)
         .animation(.easeInOut(duration: 0.3), value: explorationManager.isOverSpeed)
+        // POI 搜刮弹窗
+        .sheet(isPresented: $showScavengePopup) {
+            if let poi = popupPOI {
+                POIProximityPopup(
+                    poi: poi,
+                    isScavenging: $isScavenging,
+                    onScavenge: {
+                        await performScavenge(poi: poi)
+                    },
+                    onDismiss: {
+                        showScavengePopup = false
+                    }
+                )
+                .presentationDetents([.height(280)])
+                .presentationDragIndicator(.visible)
+            }
+        }
+        // 搜刮结果弹窗
+        .sheet(isPresented: $showScavengeResult) {
+            if let rewards = scavengeResult, let poi = scavengeResultPOI {
+                ScavengeResultView(rewards: rewards, poi: poi)
+            }
+        }
+        // 监听 ExplorationManager 的弹窗状态
+        .onChange(of: explorationManager.showScavengePopup) { _, show in
+            if show {
+                popupPOI = explorationManager.popupPOI
+                showScavengePopup = true
+                explorationManager.showScavengePopup = false
+            }
+        }
+        // 监听探索开始，搜索附近 POI
+        .onChange(of: explorationManager.isExploring) { _, isExploring in
+            if isExploring {
+                // 探索开始，搜索附近 POI
+                Task {
+                    await explorationManager.searchNearbyPOIs()
+                }
+            }
+        }
         // 监听探索状态，处理超速停止
         .onChange(of: explorationManager.state) { oldValue, newValue in
             if case .failed(let message) = newValue {
@@ -802,6 +865,32 @@ struct MapTabView: View {
             print("❌ [地图页] 结束探索失败: \(error.localizedDescription)")
             explorationError = error.localizedDescription
             showExplorationResult = true
+        }
+    }
+
+    /// 执行 POI 搜刮
+    private func performScavenge(poi: ScavengePOI) async {
+        print("🔍 [地图页] 开始搜刮 POI: \(poi.name)")
+        isScavenging = true
+
+        do {
+            let rewards = try await explorationManager.scavengePOI(poi)
+            isScavenging = false
+            showScavengePopup = false
+
+            // 延迟显示结果，等待弹窗关闭动画
+            try? await Task.sleep(nanoseconds: 300_000_000)
+
+            scavengeResult = rewards
+            scavengeResultPOI = poi
+            showScavengeResult = true
+
+            print("✅ [地图页] 搜刮完成，获得 \(rewards.count) 个物品")
+
+        } catch {
+            isScavenging = false
+            print("❌ [地图页] 搜刮失败: \(error.localizedDescription)")
+            // 可以在这里添加错误提示
         }
     }
 

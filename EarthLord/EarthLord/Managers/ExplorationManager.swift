@@ -9,6 +9,9 @@
 import Foundation
 import CoreLocation
 import Observation
+#if os(iOS)
+import UIKit
+#endif
 
 /// 探索状态枚举
 enum ExplorationState: Equatable {
@@ -95,6 +98,31 @@ final class ExplorationManager: NSObject {
         return currentRewardTier.nextTier?.displayName
     }
 
+    // MARK: - POI 相关属性
+
+    /// 附近 POI 列表（来自 POISearchManager）
+    var nearbyPOIs: [ScavengePOI] {
+        POISearchManager.shared.pois
+    }
+
+    /// 当前接近的 POI（50米内）
+    var approachingPOI: ScavengePOI?
+
+    /// 是否显示 POI 搜刮弹窗
+    var showScavengePopup: Bool = false
+
+    /// 弹窗中的 POI
+    var popupPOI: ScavengePOI?
+
+    /// 是否正在搜刮
+    var isScavenging: Bool = false
+
+    /// 最近一次搜刮的结果
+    var scavengeResult: [RewardedItem]?
+
+    /// POI 更新版本号（用于触发 UI 刷新）
+    var poiUpdateVersion: Int = 0
+
     // MARK: - Private Properties
 
     /// 位置管理器
@@ -139,6 +167,14 @@ final class ExplorationManager: NSObject {
 
     /// 上一次的速度值（用于日志）
     private var lastSpeedLog: Double = 0
+
+    // MARK: - 地理围栏相关私有属性
+
+    /// 已监控的围栏 ID 列表（最多20个）
+    private var monitoredRegionIds: Set<String> = []
+
+    /// 围栏半径（米）
+    private let geofenceRadius: CLLocationDistance = 50
 
     // MARK: - Init
 
@@ -361,6 +397,207 @@ final class ExplorationManager: NSObject {
         resetState()
     }
 
+    // MARK: - POI 搜索和围栏管理方法
+
+    /// 搜索附近 POI 并设置围栏
+    func searchNearbyPOIs() async {
+        guard let coordinate = currentCoordinate else {
+            print("⚠️ [探索] 无法搜索 POI：位置未知")
+            return
+        }
+
+        print("🔍 [探索] 开始搜索附近 POI...")
+        await POISearchManager.shared.searchNearbyPOIs(center: coordinate, forceRefresh: true)
+
+        // 为 POI 设置地理围栏
+        setupGeofences(for: POISearchManager.shared.pois)
+
+        // 触发 UI 更新
+        poiUpdateVersion += 1
+    }
+
+    /// 设置地理围栏
+    private func setupGeofences(for pois: [ScavengePOI]) {
+        // 清除旧围栏
+        clearAllGeofences()
+
+        // iOS 限制最多同时监控 20 个区域
+        let poisToMonitor = Array(pois.prefix(20))
+
+        for poi in poisToMonitor {
+            let region = CLCircularRegion(
+                center: poi.coordinate,
+                radius: geofenceRadius,
+                identifier: poi.id
+            )
+            region.notifyOnEntry = true
+            region.notifyOnExit = false
+
+            locationManager?.startMonitoring(for: region)
+            monitoredRegionIds.insert(poi.id)
+        }
+
+        print("📍 [探索] 已设置 \(poisToMonitor.count) 个地理围栏")
+    }
+
+    /// 清除所有地理围栏
+    private func clearAllGeofences() {
+        guard let manager = locationManager else { return }
+
+        for region in manager.monitoredRegions {
+            if let circular = region as? CLCircularRegion,
+               monitoredRegionIds.contains(circular.identifier) {
+                manager.stopMonitoring(for: region)
+            }
+        }
+
+        monitoredRegionIds.removeAll()
+        print("📍 [探索] 已清除所有地理围栏")
+    }
+
+    /// 处理进入围栏（在 CLLocationManagerDelegate 中调用）
+    func handleEnterRegion(identifier: String) {
+        // 查找对应的 POI
+        guard let poi = nearbyPOIs.first(where: { $0.id == identifier }),
+              poi.canScavenge else {
+            print("⚠️ [探索] 进入围栏但 POI 不可搜刮: \(identifier)")
+            return
+        }
+
+        // 设置接近的 POI
+        approachingPOI = poi
+        popupPOI = poi
+
+        // 显示弹窗
+        showScavengePopup = true
+
+        // 触发震动提示
+        triggerApproachHaptic()
+
+        print("🎯 [探索] 进入 POI 围栏: \(poi.name)")
+    }
+
+    /// 触发接近震动
+    private func triggerApproachHaptic() {
+        #if os(iOS)
+        let generator = UINotificationFeedbackGenerator()
+        generator.prepare()
+        generator.notificationOccurred(.success)
+        #endif
+    }
+
+    // MARK: - 搜刮方法
+
+    /// 执行搜刮
+    func scavengePOI(_ poi: ScavengePOI) async throws -> [RewardedItem] {
+        guard poi.canScavenge else {
+            throw ScavengeError.notInRange
+        }
+
+        isScavenging = true
+        print("🔍 [探索] 开始搜刮: \(poi.name)")
+
+        // 模拟搜刮动画延迟
+        try await Task.sleep(nanoseconds: 1_500_000_000) // 1.5秒
+
+        // 生成奖励
+        let rewards = try await generateScavengeRewards(tier: poi.rewardTier)
+
+        // 添加到背包
+        if !rewards.isEmpty {
+            try await supabaseService.addItemsToInventory(items: rewards)
+            print("🎒 [探索] 搜刮物品已添加到背包，共 \(rewards.count) 种")
+        }
+
+        // 标记 POI 为已搜刮
+        POISearchManager.shared.markAsScavenged(poiId: poi.id)
+
+        // 触发 UI 更新
+        poiUpdateVersion += 1
+
+        isScavenging = false
+        scavengeResult = rewards
+
+        print("✅ [探索] 搜刮完成，获得 \(rewards.count) 种物品")
+
+        return rewards
+    }
+
+    /// 根据 POI 类型生成搜刮奖励
+    private func generateScavengeRewards(tier: ScavengeTier) async throws -> [RewardedItem] {
+        // 确保物品定义已加载
+        await RewardGenerator.shared.preloadCache()
+
+        // 物品数量 1-3 个
+        let itemCount = Int.random(in: 1...3)
+        var rewards: [RewardedItem] = []
+
+        // 获取所有物品定义
+        let allItems = RewardGenerator.shared.getAllItemDefinitions()
+
+        for _ in 0..<itemCount {
+            // 根据权重随机选择分类
+            let category = selectCategory(from: tier.categoryWeights)
+
+            // 随机稀有度
+            let rarity = randomRarity()
+
+            // 从该分类中随机选择物品
+            if let item = selectItemFromCategory(items: allItems, category: category, rarity: rarity) {
+                let quality: DBItemQuality? = item.hasQuality ? DBItemQuality.random() : nil
+                let quantity = item.rarity == .common ? Int.random(in: 1...3) : 1
+
+                rewards.append(RewardedItem(
+                    itemId: item.id,
+                    quantity: quantity,
+                    quality: quality
+                ))
+            }
+        }
+
+        return rewards
+    }
+
+    /// 根据权重选择分类
+    private func selectCategory(from weights: [(DBItemCategory, Double)]) -> DBItemCategory {
+        let total = weights.reduce(0) { $0 + $1.1 }
+        var random = Double.random(in: 0..<total)
+
+        for (category, weight) in weights {
+            random -= weight
+            if random <= 0 {
+                return category
+            }
+        }
+
+        return weights.first?.0 ?? .misc
+    }
+
+    /// 随机稀有度
+    private func randomRarity() -> DBItemRarity {
+        let roll = Double.random(in: 0..<100)
+        switch roll {
+        case ..<60: return .common
+        case ..<85: return .uncommon
+        case ..<95: return .rare
+        case ..<99: return .epic
+        default: return .legendary
+        }
+    }
+
+    /// 从分类中选择物品
+    private func selectItemFromCategory(items: [DBItemDefinition], category: DBItemCategory, rarity: DBItemRarity) -> DBItemDefinition? {
+        let filteredItems = items.filter { $0.category == category && $0.rarity == rarity }
+
+        // 如果没有完全匹配的，放宽稀有度要求
+        if filteredItems.isEmpty {
+            let categoryItems = items.filter { $0.category == category }
+            return categoryItems.randomElement()
+        }
+
+        return filteredItems.randomElement()
+    }
+
     // MARK: - Private Methods
 
     private func resetState() {
@@ -380,6 +617,15 @@ final class ExplorationManager: NSObject {
         overSpeedStartTime = nil
         stopOverSpeedTimer()
         lastSpeedLog = 0
+        // 重置 POI 相关状态
+        clearAllGeofences()
+        POISearchManager.shared.clearPOIs()
+        showScavengePopup = false
+        popupPOI = nil
+        approachingPOI = nil
+        isScavenging = false
+        scavengeResult = nil
+        poiUpdateVersion = 0
         print("🔄 [探索] 状态已重置")
     }
 
@@ -615,6 +861,30 @@ extension ExplorationManager: CLLocationManagerDelegate {
             print("📍 [探索] 授权状态变更: \(manager.authorizationStatus.rawValue)")
         }
     }
+
+    /// 进入地理围栏
+    nonisolated func locationManager(_ manager: CLLocationManager, didEnterRegion region: CLRegion) {
+        Task { @MainActor in
+            guard state == .exploring else { return }
+
+            print("📍 [探索] 进入区域: \(region.identifier)")
+            handleEnterRegion(identifier: region.identifier)
+        }
+    }
+
+    /// 围栏监控失败
+    nonisolated func locationManager(_ manager: CLLocationManager, monitoringDidFailFor region: CLRegion?, withError error: Error) {
+        Task { @MainActor in
+            print("❌ [探索] 围栏监控失败: \(region?.identifier ?? "unknown") - \(error.localizedDescription)")
+        }
+    }
+
+    /// 开始监控区域
+    nonisolated func locationManager(_ manager: CLLocationManager, didStartMonitoringFor region: CLRegion) {
+        Task { @MainActor in
+            print("📍 [探索] 开始监控区域: \(region.identifier)")
+        }
+    }
 }
 
 // MARK: - Exploration Error
@@ -683,6 +953,26 @@ struct ExplorationResult {
             return String(format: "%.2f km", totalDistance / 1000)
         } else {
             return String(format: "%.0f m", totalDistance)
+        }
+    }
+}
+
+// MARK: - Scavenge Error
+
+/// 搜刮错误
+enum ScavengeError: LocalizedError {
+    case notInRange
+    case alreadyScavenged
+    case noRewardsGenerated
+
+    var errorDescription: String? {
+        switch self {
+        case .notInRange:
+            return "距离太远，无法搜刮"
+        case .alreadyScavenged:
+            return "该地点已被搜刮"
+        case .noRewardsGenerated:
+            return "搜刮失败，未找到物资"
         }
     }
 }
