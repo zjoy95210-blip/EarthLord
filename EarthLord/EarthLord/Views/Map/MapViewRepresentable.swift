@@ -457,13 +457,19 @@ struct MapViewRepresentable: UIViewRepresentable {
                     annotationView?.annotation = poiAnnotation
                 }
 
-                // 根据 POI 类型设置颜色和图标
+                // 根据 POI 类型和状态设置颜色和图标
                 let poi = poiAnnotation.poi
-                annotationView?.markerTintColor = UIColor(poi.category.color)
-                annotationView?.glyphImage = UIImage(systemName: poi.category.iconName)
 
-                // 根据状态设置透明度
-                annotationView?.alpha = poi.canScavenge ? 1.0 : 0.5
+                // 已搜刮的 POI 显示灰色
+                if poi.status == .depleted {
+                    annotationView?.markerTintColor = .systemGray
+                    annotationView?.alpha = 0.6
+                } else {
+                    annotationView?.markerTintColor = UIColor(poi.category.color)
+                    annotationView?.alpha = 1.0
+                }
+
+                annotationView?.glyphImage = UIImage(systemName: poi.category.iconName)
 
                 return annotationView
             }
