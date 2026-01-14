@@ -460,6 +460,18 @@ final class ExplorationManager: NSObject {
 
     /// 处理进入围栏（在 CLLocationManagerDelegate 中调用）
     func handleEnterRegion(identifier: String) {
+        // 防止重复弹窗：如果已有弹窗显示中，忽略
+        guard !showScavengePopup else {
+            print("⚠️ [探索] 弹窗已显示，忽略进入围栏: \(identifier)")
+            return
+        }
+
+        // 防止搜刮中再次弹窗
+        guard !isScavenging else {
+            print("⚠️ [探索] 正在搜刮中，忽略进入围栏: \(identifier)")
+            return
+        }
+
         // 查找对应的 POI
         guard let poi = nearbyPOIs.first(where: { $0.id == identifier }),
               poi.canScavenge else {
