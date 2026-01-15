@@ -74,7 +74,8 @@ final class POISearchManager {
     /// - Parameters:
     ///   - center: 搜索中心点坐标
     ///   - forceRefresh: 是否强制刷新（忽略时间间隔）
-    func searchNearbyPOIs(center: CLLocationCoordinate2D, forceRefresh: Bool = false) async {
+    ///   - maxCount: 最大返回数量（根据密度等级决定，默认20）
+    func searchNearbyPOIs(center: CLLocationCoordinate2D, forceRefresh: Bool = false, maxCount: Int = 20) async {
         // 检查搜索间隔
         if !forceRefresh, let lastTime = lastSearchTime {
             let elapsed = Date().timeIntervalSince(lastTime)
@@ -115,11 +116,13 @@ final class POISearchManager {
         // 按距离排序
         let sortedPOIs = Array(uniquePOIs.values).sorted { $0.distanceToPlayer < $1.distanceToPlayer }
 
-        // 限制最多显示 20 个（因为地理围栏限制）
-        pois = Array(sortedPOIs.prefix(20))
+        // 限制返回数量（根据密度等级和地理围栏限制）
+        // 地理围栏最多支持 15 个，所以取 min(maxCount, 15)
+        let actualMaxCount = min(maxCount, 15)
+        pois = Array(sortedPOIs.prefix(actualMaxCount))
 
         isSearching = false
-        print("🔍 [POI搜索] 搜索完成，共找到 \(pois.count) 个 POI")
+        print("🔍 [POI搜索] 搜索完成，共找到 \(pois.count) 个 POI（限制: \(actualMaxCount)）")
 
         // 打印 POI 列表
         for (index, poi) in pois.enumerated() {

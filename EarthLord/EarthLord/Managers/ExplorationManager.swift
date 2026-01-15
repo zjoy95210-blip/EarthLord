@@ -121,6 +121,19 @@ final class ExplorationManager: NSObject {
     /// POI 更新版本号（用于触发 UI 刷新）
     var poiUpdateVersion: Int = 0
 
+    // MARK: - 玩家密度相关属性
+
+    /// 附近玩家数量
+    var nearbyPlayerCount: Int = 0
+
+    /// 当前密度等级
+    var densityLevel: PlayerDensityLevel {
+        PlayerDensityLevel.from(nearbyPlayerCount: nearbyPlayerCount)
+    }
+
+    /// 位置服务
+    private let playerLocationService = PlayerLocationService.shared
+
     // MARK: - Private Properties
 
     /// 位置管理器
@@ -262,6 +275,16 @@ final class ExplorationManager: NSObject {
         locationManager?.startUpdatingLocation()
         startTimer()
 
+        // 启动玩家位置上报服务
+        playerLocationService.startReporting()
+
+        // 查询附近玩家数量
+        if let coord = startCoordinate {
+            nearbyPlayerCount = await playerLocationService.queryNearbyPlayers(at: coord)
+            print("👥 [探索] 附近玩家数量: \(nearbyPlayerCount) (\(densityLevel.displayName))")
+            print("👥 [探索] 建议 POI 数量: \(densityLevel.suggestedPOICount)")
+        }
+
         print("🚶 [探索] ========== 探索已开始 ==========")
         print("🚶 [探索] 速度限制: \(Int(speedLimit))km/h")
         print("🚶 [探索] 超速容忍时间: \(Int(overSpeedTolerance))秒")
@@ -284,6 +307,9 @@ final class ExplorationManager: NSObject {
         locationManager?.stopUpdatingLocation()
         stopTimer()
         stopOverSpeedTimer()
+
+        // 停止玩家位置上报服务
+        playerLocationService.stopReporting()
 
         // 计算最终数据
         let finalDuration = duration
@@ -407,8 +433,12 @@ final class ExplorationManager: NSObject {
             return
         }
 
+        // 根据玩家密度决定 POI 数量
+        let suggestedCount = densityLevel.suggestedPOICount
         print("🔍 [探索] 开始搜索附近 POI...")
-        await POISearchManager.shared.searchNearbyPOIs(center: coordinate, forceRefresh: true)
+        print("👥 [探索] 密度等级: \(densityLevel.displayName), 建议 POI 数量: \(suggestedCount)")
+
+        await POISearchManager.shared.searchNearbyPOIs(center: coordinate, forceRefresh: true, maxCount: suggestedCount)
 
         // 复制 POI 到存储属性（确保 SwiftUI 观察到变化）
         nearbyPOIs = POISearchManager.shared.pois
@@ -737,6 +767,8 @@ final class ExplorationManager: NSObject {
         isScavenging = false
         scavengeResult = nil
         poiUpdateVersion = 0
+        // 重置密度相关状态
+        nearbyPlayerCount = 0
         print("🔄 [探索] 状态已重置")
     }
 
