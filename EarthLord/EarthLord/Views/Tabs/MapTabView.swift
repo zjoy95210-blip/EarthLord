@@ -68,8 +68,8 @@ struct MapTabView: View {
     @State private var showScavengePopup: Bool = false
     /// 当前弹窗 POI
     @State private var popupPOI: ScavengePOI?
-    /// 搜刮结果
-    @State private var scavengeResult: [RewardedItem]?
+    /// 搜刮结果（AI 生成物品）
+    @State private var scavengeResult: [AIRewardedItem]?
     /// 搜刮结果对应的 POI
     @State private var scavengeResultPOI: ScavengePOI?
     /// 是否正在搜刮
@@ -219,8 +219,8 @@ struct MapTabView: View {
         }
         // 搜刮结果弹窗
         .sheet(isPresented: $showScavengeResult) {
-            if let rewards = scavengeResult, let poi = scavengeResultPOI {
-                ScavengeResultView(rewards: rewards, poi: poi)
+            if let aiRewards = scavengeResult, let poi = scavengeResultPOI {
+                ScavengeResultView(aiRewards: aiRewards, poi: poi)
             }
         }
         // 监听 ExplorationManager 的弹窗状态
@@ -870,22 +870,22 @@ struct MapTabView: View {
 
     /// 执行 POI 搜刮
     private func performScavenge(poi: ScavengePOI) async {
-        print("🔍 [地图页] 开始搜刮 POI: \(poi.name)")
+        print("🔍 [地图页] 开始搜刮 POI: \(poi.name) (危险等级: \(poi.dangerLevel.displayName))")
         isScavenging = true
 
         do {
-            let rewards = try await explorationManager.scavengePOI(poi)
+            let aiRewards = try await explorationManager.scavengePOI(poi)
             isScavenging = false
             showScavengePopup = false
 
             // 延迟显示结果，等待弹窗关闭动画
             try? await Task.sleep(nanoseconds: 300_000_000)
 
-            scavengeResult = rewards
+            scavengeResult = aiRewards
             scavengeResultPOI = poi
             showScavengeResult = true
 
-            print("✅ [地图页] 搜刮完成，获得 \(rewards.count) 个物品")
+            print("✅ [地图页] 搜刮完成，获得 \(aiRewards.count) 个 AI 生成物品")
 
         } catch {
             isScavenging = false

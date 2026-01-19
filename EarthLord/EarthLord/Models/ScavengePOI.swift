@@ -112,6 +112,24 @@ enum ScavengePOICategory: String, CaseIterable, Codable, Sendable {
         }
     }
 
+    /// 默认危险等级
+    var defaultDangerLevel: DangerLevel {
+        switch self {
+        case .park, .library:
+            return .low           // 1 - 低危
+        case .convenienceStore, .cafe:
+            return .medium        // 2 - 中低危
+        case .supermarket, .restaurant, .school:
+            return .moderate      // 3 - 中危
+        case .gasStation, .hospital:
+            return .high          // 4 - 高危
+        case .pharmacy:
+            return .extreme       // 5 - 极危（末世稀缺医疗资源）
+        case .unknown:
+            return .moderate      // 3 - 中危
+        }
+    }
+
     /// 从 MKPointOfInterestCategory 转换
     static func from(_ mkCategory: MKPointOfInterestCategory?) -> ScavengePOICategory {
         guard let mk = mkCategory else { return .unknown }
@@ -173,10 +191,32 @@ struct ScavengePOI: Identifiable, Equatable, Sendable {
     let name: String                         // POI 名称
     let category: ScavengePOICategory        // POI 分类
     let coordinate: CLLocationCoordinate2D   // 坐标
+    let dangerLevel: DangerLevel             // 危险等级
 
     var status: ScavengePOIStatus = .available  // 搜刮状态
     var lastScavengedAt: Date?               // 最后搜刮时间
     var distanceToPlayer: Double = 0         // 与玩家的距离（米）
+
+    /// 初始化（危险等级可选，默认根据分类确定）
+    init(
+        id: String,
+        name: String,
+        category: ScavengePOICategory,
+        coordinate: CLLocationCoordinate2D,
+        dangerLevel: DangerLevel? = nil,
+        status: ScavengePOIStatus = .available,
+        lastScavengedAt: Date? = nil,
+        distanceToPlayer: Double = 0
+    ) {
+        self.id = id
+        self.name = name
+        self.category = category
+        self.coordinate = coordinate
+        self.dangerLevel = dangerLevel ?? category.defaultDangerLevel
+        self.status = status
+        self.lastScavengedAt = lastScavengedAt
+        self.distanceToPlayer = distanceToPlayer
+    }
 
     /// 是否在搜刮范围内（50米）
     var isInRange: Bool {

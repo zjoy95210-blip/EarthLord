@@ -489,18 +489,22 @@ struct POIDetailView: View {
 
 // MARK: - 危险等级枚举
 
-enum DangerLevel: String, CaseIterable {
-    case safe = "safe"
-    case low = "low"
-    case medium = "medium"
-    case high = "high"
+enum DangerLevel: String, CaseIterable, Codable, Sendable {
+    case safe = "safe"          // 安全
+    case low = "low"            // 低危 (1)
+    case medium = "medium"      // 中低危 (2)
+    case moderate = "moderate"  // 中危 (3)
+    case high = "high"          // 高危 (4)
+    case extreme = "extreme"    // 极危 (5)
 
     var displayName: String {
         switch self {
         case .safe: return "安全"
         case .low: return "低危"
-        case .medium: return "中危"
+        case .medium: return "中低危"
+        case .moderate: return "中危"
         case .high: return "高危"
+        case .extreme: return "极危"
         }
     }
 
@@ -508,8 +512,10 @@ enum DangerLevel: String, CaseIterable {
         switch self {
         case .safe: return "shield.checkered"
         case .low: return "exclamationmark.shield"
-        case .medium: return "exclamationmark.triangle"
-        case .high: return "exclamationmark.octagon.fill"
+        case .medium: return "exclamationmark.shield.fill"
+        case .moderate: return "exclamationmark.triangle"
+        case .high: return "exclamationmark.triangle.fill"
+        case .extreme: return "exclamationmark.octagon.fill"
         }
     }
 
@@ -517,8 +523,22 @@ enum DangerLevel: String, CaseIterable {
         switch self {
         case .safe: return Color(hex: "4CAF50")      // 绿色
         case .low: return Color(hex: "8BC34A")       // 浅绿
-        case .medium: return Color(hex: "FF9800")    // 橙色
-        case .high: return Color(hex: "F44336")      // 红色
+        case .medium: return Color(hex: "CDDC39")    // 黄绿
+        case .moderate: return Color(hex: "FFC107")  // 黄色
+        case .high: return Color(hex: "FF9800")      // 橙色
+        case .extreme: return Color(hex: "F44336")   // 红色
+        }
+    }
+
+    /// 整数值（用于 API 请求）
+    var intValue: Int {
+        switch self {
+        case .safe: return 0
+        case .low: return 1
+        case .medium: return 2
+        case .moderate: return 3
+        case .high: return 4
+        case .extreme: return 5
         }
     }
 }

@@ -118,6 +118,9 @@ final class ExplorationManager: NSObject {
     /// 最近一次搜刮的结果
     var scavengeResult: [RewardedItem]?
 
+    /// 最近一次搜刮的 AI 结果（包含故事）
+    var aiScavengeResult: [AIRewardedItem]?
+
     /// POI 更新版本号（用于触发 UI 刷新）
     var poiUpdateVersion: Int = 0
 
@@ -622,22 +625,24 @@ final class ExplorationManager: NSObject {
 
     // MARK: - 搜刮方法
 
-    /// 执行搜刮
-    func scavengePOI(_ poi: ScavengePOI) async throws -> [RewardedItem] {
+    /// 执行搜刮（使用 AI 生成物品）
+    func scavengePOI(_ poi: ScavengePOI) async throws -> [AIRewardedItem] {
         guard poi.canScavenge else {
             throw ScavengeError.notInRange
         }
 
         isScavenging = true
         print("🔍 [探索] 开始搜刮: \(poi.name)")
+        print("🔍 [探索] 危险等级: \(poi.dangerLevel.displayName)")
 
         // 模拟搜刮动画延迟
         try await Task.sleep(nanoseconds: 1_500_000_000) // 1.5秒
 
-        // 生成奖励
-        let rewards = try await generateScavengeRewards(tier: poi.rewardTier)
+        // 使用 AI 生成物品
+        let aiRewards = try await AIItemGenerator.shared.generateItems(for: poi)
 
-        // 添加到背包
+        // 转换为 RewardedItem 并添加到背包
+        let rewards = aiRewards.map { $0.toRewardedItem() }
         if !rewards.isEmpty {
             try await supabaseService.addItemsToInventory(items: rewards)
             print("🎒 [探索] 搜刮物品已添加到背包，共 \(rewards.count) 种")
@@ -656,11 +661,12 @@ final class ExplorationManager: NSObject {
         poiUpdateVersion += 1
 
         isScavenging = false
-        scavengeResult = rewards
+        aiScavengeResult = aiRewards  // 保存 AI 结果（包含故事）
+        scavengeResult = rewards      // 兼容旧代码
 
-        print("✅ [探索] 搜刮完成，获得 \(rewards.count) 种物品")
+        print("✅ [探索] 搜刮完成，获得 \(aiRewards.count) 种 AI 生成物品")
 
-        return rewards
+        return aiRewards
     }
 
     /// 根据 POI 类型生成搜刮奖励

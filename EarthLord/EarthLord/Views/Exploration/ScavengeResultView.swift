@@ -3,7 +3,7 @@
 //  EarthLord
 //
 //  搜刮结果展示
-//  显示从 POI 搜刮获得的物品
+//  显示从 POI 搜刮获得的 AI 生成物品，包含独特名称和背景故事
 //
 
 import SwiftUI
@@ -14,17 +14,15 @@ struct ScavengeResultView: View {
 
     // MARK: - Properties
 
-    let rewards: [RewardedItem]
+    let aiRewards: [AIRewardedItem]
     let poi: ScavengePOI
 
     @Environment(\.dismiss) private var dismiss
 
-    /// 物品定义缓存
-    @State private var itemDefinitions: [DBItemDefinition] = []
-
     /// 动画状态
     @State private var showContent: Bool = false
     @State private var visibleItems: Set<Int> = []
+    @State private var expandedStories: Set<Int> = []
 
     // MARK: - Body
 
@@ -61,33 +59,36 @@ struct ScavengeResultView: View {
                         Text(poi.name)
                             .font(.system(size: 14))
                             .foregroundColor(ApocalypseTheme.textSecondary)
+
+                        // 危险等级标签
+                        Text(poi.dangerLevel.displayName)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(
+                                Capsule()
+                                    .fill(Color(hex: poi.dangerLevel.colorHex))
+                            )
                     }
                 }
                 .opacity(showContent ? 1.0 : 0.0)
 
                 // 物品列表
-                if rewards.isEmpty {
-                    VStack(spacing: 12) {
-                        Image(systemName: "tray")
-                            .font(.system(size: 40))
-                            .foregroundColor(ApocalypseTheme.textMuted)
-                        Text("这里已经被搜刮一空了...")
-                            .font(.system(size: 15))
-                            .foregroundColor(ApocalypseTheme.textMuted)
-                    }
-                    .padding(.vertical, 30)
+                if aiRewards.isEmpty {
+                    emptyStateView
                 } else {
                     ScrollView {
                         VStack(spacing: 12) {
-                            ForEach(Array(rewards.enumerated()), id: \.offset) { index, item in
-                                rewardItemRow(item: item, index: index)
+                            ForEach(Array(aiRewards.enumerated()), id: \.element.id) { index, item in
+                                aiRewardItemRow(item: item, index: index)
                                     .opacity(visibleItems.contains(index) ? 1.0 : 0.0)
                                     .offset(x: visibleItems.contains(index) ? 0 : -30)
                             }
                         }
                         .padding(.horizontal, 20)
                     }
-                    .frame(maxHeight: 300)
+                    .frame(maxHeight: 400)
                 }
 
                 Spacer()
@@ -113,37 +114,53 @@ struct ScavengeResultView: View {
             .padding(.top, 40)
         }
         .onAppear {
-            loadItemDefinitions()
             startAnimations()
         }
     }
 
-    /// 物品行
+    // MARK: - Views
+
+    /// 空状态视图
+    private var emptyStateView: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "tray")
+                .font(.system(size: 40))
+                .foregroundColor(ApocalypseTheme.textMuted)
+            Text("这里已经被搜刮一空了...")
+                .font(.system(size: 15))
+                .foregroundColor(ApocalypseTheme.textMuted)
+        }
+        .padding(.vertical, 30)
+    }
+
+    /// AI 物品行（含故事）
     @ViewBuilder
-    private func rewardItemRow(item: RewardedItem, index: Int) -> some View {
-        if let def = itemDefinitions.first(where: { $0.id == item.itemId }) {
+    private func aiRewardItemRow(item: AIRewardedItem, index: Int) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // 物品信息
             HStack(spacing: 14) {
                 // 图标
                 ZStack {
                     Circle()
-                        .fill(rarityColor(for: def.rarity).opacity(0.15))
+                        .fill(rarityColor(for: item.rarity).opacity(0.15))
                         .frame(width: 44, height: 44)
 
-                    Image(systemName: categoryIcon(for: def.category))
+                    Image(systemName: categoryIcon(for: item.category))
                         .font(.system(size: 20))
-                        .foregroundColor(rarityColor(for: def.rarity))
+                        .foregroundColor(rarityColor(for: item.rarity))
                 }
 
-                // 名称和品质
+                // 名称和稀有度
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(def.name)
+                    Text(item.name)
                         .font(.system(size: 15, weight: .medium))
                         .foregroundColor(ApocalypseTheme.textPrimary)
+                        .lineLimit(1)
 
                     HStack(spacing: 6) {
-                        Text(def.rarity.displayName)
+                        Text(item.rarity.displayName)
                             .font(.system(size: 11))
-                            .foregroundColor(rarityColor(for: def.rarity))
+                            .foregroundColor(rarityColor(for: item.rarity))
 
                         if let quality = item.quality {
                             Text("[\(quality.displayName)]")
@@ -160,18 +177,60 @@ struct ScavengeResultView: View {
                     .font(.system(size: 18, weight: .bold))
                     .foregroundColor(ApocalypseTheme.primary)
             }
-            .padding(12)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(ApocalypseTheme.cardBackground)
-            )
+            .contentShape(Rectangle())
+            .onTapGesture {
+                withAnimation(.spring(response: 0.3)) {
+                    if expandedStories.contains(index) {
+                        expandedStories.remove(index)
+                    } else {
+                        expandedStories.insert(index)
+                    }
+                }
+            }
+
+            // 故事（可展开）
+            if expandedStories.contains(index) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Divider()
+                        .background(ApocalypseTheme.textMuted.opacity(0.3))
+
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: "book.closed.fill")
+                            .font(.system(size: 12))
+                            .foregroundColor(ApocalypseTheme.textMuted)
+
+                        Text(item.story)
+                            .font(.system(size: 13))
+                            .foregroundColor(ApocalypseTheme.textSecondary)
+                            .lineSpacing(4)
+                    }
+                }
+                .padding(.top, 10)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+
+            // 展开提示
+            if !expandedStories.contains(index) {
+                HStack {
+                    Spacer()
+                    Text("点击查看故事")
+                        .font(.system(size: 10))
+                        .foregroundColor(ApocalypseTheme.textMuted)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 10))
+                        .foregroundColor(ApocalypseTheme.textMuted)
+                }
+                .padding(.top, 4)
+            }
         }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(ApocalypseTheme.cardBackground)
+        )
     }
 
-    /// 加载物品定义
-    private func loadItemDefinitions() {
-        itemDefinitions = RewardGenerator.shared.getAllItemDefinitions()
-    }
+    // MARK: - Helpers
 
     /// 启动动画
     private func startAnimations() {
@@ -180,7 +239,7 @@ struct ScavengeResultView: View {
         }
 
         // 依次显示物品
-        for index in rewards.indices {
+        for index in aiRewards.indices {
             let delay = 0.3 + Double(index) * 0.15
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
@@ -214,15 +273,41 @@ struct ScavengeResultView: View {
 
 #Preview {
     ScavengeResultView(
-        rewards: [
-            RewardedItem(itemId: "water_bottle", quantity: 2, quality: .normal),
-            RewardedItem(itemId: "canned_food", quantity: 1, quality: .fine)
+        aiRewards: [
+            AIRewardedItem(
+                itemId: "ai_medical_001",
+                name: "「最后的希望」应急包",
+                category: .medical,
+                rarity: .epic,
+                story: "这个急救包上贴着一张便签：'给值夜班的自己准备的'。便签已经褪色，主人再也没能用上它...",
+                quantity: 1,
+                quality: .pristine
+            ),
+            AIRewardedItem(
+                itemId: "ai_food_002",
+                name: "护士站的咖啡罐头",
+                category: .food,
+                rarity: .rare,
+                story: "罐头上写着'夜班续命神器'。末日来临时，护士们大概正在喝着咖啡讨论患者病情。",
+                quantity: 2,
+                quality: nil
+            ),
+            AIRewardedItem(
+                itemId: "ai_medical_003",
+                name: "急诊科常备止痛片",
+                category: .medical,
+                rarity: .uncommon,
+                story: "瓶身上还贴着患者的名字，他大概永远不会来取了。",
+                quantity: 3,
+                quality: .normal
+            )
         ],
         poi: ScavengePOI(
             id: "test_poi",
-            name: "测试超市",
-            category: .supermarket,
+            name: "协和医院急诊室",
+            category: .hospital,
             coordinate: .init(latitude: 0, longitude: 0),
+            dangerLevel: .high,
             status: .depleted,
             lastScavengedAt: Date(),
             distanceToPlayer: 32
