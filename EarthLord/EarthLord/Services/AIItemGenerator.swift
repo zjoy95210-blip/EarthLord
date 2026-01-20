@@ -7,6 +7,8 @@
 //
 
 import Foundation
+import Supabase
+import Functions
 
 /// AI 物品生成错误
 enum AIGeneratorError: LocalizedError {

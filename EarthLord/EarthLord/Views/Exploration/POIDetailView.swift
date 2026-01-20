@@ -530,6 +530,17 @@ enum DangerLevel: String, CaseIterable, Codable, Sendable {
         }
     }
 
+    var colorHex: String {
+        switch self {
+        case .safe: return "4CAF50"      // 绿色
+        case .low: return "8BC34A"       // 浅绿
+        case .medium: return "CDDC39"    // 黄绿
+        case .moderate: return "FFC107"  // 黄色
+        case .high: return "FF9800"      // 橙色
+        case .extreme: return "F44336"   // 红色
+        }
+    }
+
     /// 整数值（用于 API 请求）
     var intValue: Int {
         switch self {
