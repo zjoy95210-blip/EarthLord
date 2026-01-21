@@ -195,8 +195,8 @@ final class POISearchManager {
             let playerCL = CLLocation(latitude: center.latitude, longitude: center.longitude)
 
             let result = response.mapItems.compactMap { mapItem -> ScavengePOI? in
-                // 使用 location 替代已废弃的 placemark.location
-                let location = mapItem.location
+                // 使用 placemark.location 以兼容 iOS 26 以下版本
+                guard let location = mapItem.placemark.location else { return nil }
 
                 // 计算距离
                 let distance = playerCL.distance(from: location)
