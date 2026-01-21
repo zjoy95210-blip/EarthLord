@@ -18,6 +18,8 @@
 	<key>GIDClientID</key>
 	<string>1045886522786-s7m993mdi2ufjr3908gker6ed2hnribm.apps.googleusercontent.com</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>《地球新主》需要获取您的位置来显示您在末日世界中的坐标，帮助您探索和圈定领地。</string>
+	<string>《新地球之主》需要获取您的位置来显示您在末日世界中的坐标，帮助您探索和圈定领地。</string>
+	<key>CFBundleDisplayName</key>
+	<string>New Earth Lord</string>
 </dict>
 </plist>

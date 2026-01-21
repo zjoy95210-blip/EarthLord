@@ -13,7 +13,7 @@
     "[%@]" : {
 
     },
-    "《地球新主》需要获取您的位置来显示您在末日世界中的坐标，帮助您探索和圈定领地。" : {
+    "《新地球之主》需要获取您的位置来显示您在末日世界中的坐标，帮助您探索和圈定领地。" : {
 
     },
     "%lld" : {
@@ -37,7 +37,7 @@
     "ap-southeast-1" : {
 
     },
-    "EARTH LORD" : {
+    "NEW EARTH LORD" : {
 
     },
     "English" : {
@@ -291,12 +291,12 @@
         }
       }
     },
-    "地球新主" : {
+    "新地球之主" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Earth Lord"
+            "value" : "New Earth Lord"
           }
         }
       }
@@ -322,6 +322,7 @@
       }
     },
     "密码" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -564,6 +565,7 @@
       }
     },
     "未知邮箱" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -711,6 +713,7 @@
       }
     },
     "用户" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -754,6 +757,7 @@
 
     },
     "确认密码" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
