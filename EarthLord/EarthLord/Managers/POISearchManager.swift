@@ -232,8 +232,7 @@ final class POISearchManager {
     private func generatePOIId(mapItem: MKMapItem) -> String {
         // 使用名称+坐标生成唯一ID
         let name = mapItem.name ?? "unknown"
-        // 使用 location 替代已废弃的 placemark.coordinate
-        let coordinate = mapItem.location.coordinate
+        let coordinate = mapItem.placemark.coordinate
         let lat = String(format: "%.6f", coordinate.latitude)
         let lng = String(format: "%.6f", coordinate.longitude)
         return "\(name)_\(lat)_\(lng)"

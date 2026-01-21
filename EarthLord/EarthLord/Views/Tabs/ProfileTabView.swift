@@ -92,6 +92,39 @@ struct ProfileTabView: View {
                     Text("切换语言后立即生效，无需重启 App")
                 }
 
+                // 关于
+                Section("关于") {
+                    // 技术支持
+                    Button {
+                        if let url = URL(string: "https://zjoy95210-blip.github.io/earthlord-support/") {
+                            UIApplication.shared.open(url)
+                        }
+                    } label: {
+                        HStack {
+                            Label("技术支持", systemImage: "questionmark.circle")
+                                .foregroundColor(.primary)
+                            Spacer()
+                            Image(systemName: "arrow.up.right.square")
+                                .foregroundColor(.secondary)
+                        }
+                    }
+
+                    // 隐私政策
+                    Button {
+                        if let url = URL(string: "https://zjoy95210-blip.github.io/earthlord-support/privacy.html") {
+                            UIApplication.shared.open(url)
+                        }
+                    } label: {
+                        HStack {
+                            Label("隐私政策", systemImage: "hand.raised")
+                                .foregroundColor(.primary)
+                            Spacer()
+                            Image(systemName: "arrow.up.right.square")
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+
                 // 游戏数据
                 Section("游戏数据") {
                     HStack {
