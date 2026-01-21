@@ -13,7 +13,7 @@
     "[%@]" : {
 
     },
-    "《新地球之主》需要获取您的位置来显示您在末日世界中的坐标，帮助您探索和圈定领地。" : {
+    "《废土领主》需要获取您的位置来显示您在末日世界中的坐标，帮助您探索和圈定领地。" : {
 
     },
     "%lld" : {
@@ -37,7 +37,7 @@
     "ap-southeast-1" : {
 
     },
-    "NEW EARTH LORD" : {
+    "WASTELAND LORD" : {
 
     },
     "English" : {
@@ -291,12 +291,12 @@
         }
       }
     },
-    "新地球之主" : {
+    "废土领主" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "New Earth Lord"
+            "value" : "Wasteland Lord"
           }
         }
       }
