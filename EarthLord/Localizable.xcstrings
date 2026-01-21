@@ -13,7 +13,7 @@
     "[%@]" : {
 
     },
-    "《废土领主》需要获取您的位置来显示您在末日世界中的坐标，帮助您探索和圈定领地。" : {
+    "《当下之希望》需要获取您的位置来显示您在末日世界中的坐标，帮助您探索和圈定领地。" : {
 
     },
     "%lld" : {
@@ -37,7 +37,7 @@
     "ap-southeast-1" : {
 
     },
-    "WASTELAND LORD" : {
+    "PRESENT HOPE" : {
 
     },
     "English" : {
@@ -291,12 +291,12 @@
         }
       }
     },
-    "废土领主" : {
+    "当下之希望" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Wasteland Lord"
+            "value" : "Present Hope"
           }
         }
       }
