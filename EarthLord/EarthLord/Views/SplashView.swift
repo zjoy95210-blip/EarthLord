@@ -95,7 +95,7 @@ struct SplashView: View {
                         .font(.system(size: 36, weight: .bold))
                         .foregroundColor(ApocalypseTheme.textPrimary)
 
-                    Text("PRESENT HOPE")
+                    Text("HOPE BY ZJOY")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(ApocalypseTheme.textSecondary)
                         .tracking(4)
