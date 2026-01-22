@@ -103,7 +103,7 @@ struct AuthView: View {
                 .shadow(color: .cyan.opacity(0.5), radius: 20)
 
             // 标题
-            Text("ZXH希望之地")
+            Text("希望之地")
                 .font(.system(size: 36, weight: .bold))
                 .foregroundColor(.white)
 
