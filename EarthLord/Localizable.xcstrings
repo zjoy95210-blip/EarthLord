@@ -13,7 +13,7 @@
     "[%@]" : {
 
     },
-    "《当下之希望》需要获取您的位置来显示您在末日世界中的坐标，帮助您探索和圈定领地。" : {
+    "《ZXH希望之地》需要获取您的位置来显示您在末日世界中的坐标，帮助您探索和圈定领地。" : {
 
     },
     "%lld" : {
@@ -37,7 +37,7 @@
     "ap-southeast-1" : {
 
     },
-    "HOPE BY ZJOY" : {
+    "ZXH HOPELAND" : {
 
     },
     "English" : {
@@ -291,12 +291,12 @@
         }
       }
     },
-    "当下之希望" : {
+    "ZXH希望之地" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Present Hope"
+            "value" : "ZXH HopeLand"
           }
         }
       }
