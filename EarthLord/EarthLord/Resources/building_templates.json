@@ -1,0 +1,124 @@
+[
+  {
+    "id": "campfire",
+    "name": "篝火",
+    "description": "简易的篝火，能提供光明和温暖，是生存的基础设施。",
+    "category": "survival",
+    "tier": 1,
+    "max_per_territory": 3,
+    "build_time": 60,
+    "required_materials": [
+      { "item_id": "wood", "quantity": 5 },
+      { "item_id": "stone", "quantity": 3 }
+    ],
+    "max_level": 3,
+    "icon_name": "flame.fill",
+    "effects": [
+      {
+        "type": "warmth",
+        "value": 10,
+        "description": "提供温暖，减缓体温下降"
+      },
+      {
+        "type": "light",
+        "value": 5,
+        "description": "照亮周围区域"
+      }
+    ]
+  },
+  {
+    "id": "shelter",
+    "name": "庇护所",
+    "description": "简易的避难所，能够遮风挡雨，提供安全的休息场所。",
+    "category": "survival",
+    "tier": 1,
+    "max_per_territory": 1,
+    "build_time": 300,
+    "required_materials": [
+      { "item_id": "wood", "quantity": 20 },
+      { "item_id": "cloth", "quantity": 10 },
+      { "item_id": "rope", "quantity": 5 }
+    ],
+    "max_level": 5,
+    "icon_name": "house.fill",
+    "effects": [
+      {
+        "type": "shelter",
+        "value": 100,
+        "description": "提供完整的遮蔽"
+      },
+      {
+        "type": "rest_bonus",
+        "value": 1.5,
+        "description": "休息时恢复速度提升50%"
+      }
+    ]
+  },
+  {
+    "id": "small_storage",
+    "name": "小仓库",
+    "description": "用于存放物资的简易仓库，能够安全保存你的收集品。",
+    "category": "storage",
+    "tier": 1,
+    "max_per_territory": 5,
+    "build_time": 180,
+    "required_materials": [
+      { "item_id": "wood", "quantity": 15 },
+      { "item_id": "metal_scrap", "quantity": 5 }
+    ],
+    "max_level": 3,
+    "icon_name": "shippingbox.fill",
+    "effects": [
+      {
+        "type": "storage_capacity",
+        "value": 50,
+        "description": "增加50单位存储空间"
+      }
+    ]
+  },
+  {
+    "id": "simple_farm",
+    "name": "简易农田",
+    "description": "一块简单的农田，可以种植基础作物，提供稳定的食物来源。",
+    "category": "production",
+    "tier": 1,
+    "max_per_territory": 4,
+    "build_time": 240,
+    "required_materials": [
+      { "item_id": "wood", "quantity": 10 },
+      { "item_id": "fertilizer", "quantity": 3 }
+    ],
+    "max_level": 5,
+    "icon_name": "leaf.fill",
+    "effects": [
+      {
+        "type": "food_production",
+        "value": 2,
+        "description": "每天生产2单位食物"
+      }
+    ]
+  },
+  {
+    "id": "solar_panel",
+    "name": "太阳能板",
+    "description": "利用太阳能发电的设备，为基地提供清洁能源。",
+    "category": "energy",
+    "tier": 2,
+    "max_per_territory": 6,
+    "build_time": 600,
+    "required_materials": [
+      { "item_id": "metal_scrap", "quantity": 10 },
+      { "item_id": "electronic_parts", "quantity": 5 },
+      { "item_id": "glass", "quantity": 3 }
+    ],
+    "max_level": 3,
+    "icon_name": "sun.max.fill",
+    "effects": [
+      {
+        "type": "energy_production",
+        "value": 10,
+        "description": "每小时产生10单位能量"
+      }
+    ]
+  }
+]

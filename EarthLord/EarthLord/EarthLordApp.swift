@@ -15,6 +15,16 @@ struct EarthLordApp: App {
         // 配置全局 TabBar 和 NavigationBar 外观
         ApocalypseTheme.configureAppearance()
         print("🚀 [App] EarthLord 启动")
+
+        // 加载建筑模板（验证建造系统）
+        Task {
+            do {
+                try await BuildingManager.shared.loadTemplates()
+                print("✅ 模板加载成功: \(BuildingManager.shared.templates.count) 个")
+            } catch {
+                print("❌ 模板加载失败: \(error)")
+            }
+        }
     }
 
     var body: some Scene {
