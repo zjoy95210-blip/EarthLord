@@ -91,11 +91,11 @@ struct SplashView: View {
 
                 // 标题
                 VStack(spacing: 8) {
-                    Text("希望之地")
+                    Text("纯燕麦")
                         .font(.system(size: 36, weight: .bold))
                         .foregroundColor(ApocalypseTheme.textPrimary)
 
-                    Text("HOPELAND ZXH1979")
+                    Text("PURE OATS")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(ApocalypseTheme.textSecondary)
                         .tracking(4)
