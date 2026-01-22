@@ -13,7 +13,7 @@
     "[%@]" : {
 
     },
-    "《ZXH探索1979》需要获取您的位置来显示您在末日世界中的坐标，帮助您探索和圈定领地。" : {
+    "《ZJY79Quest05X》需要获取您的位置来显示您在末日世界中的坐标，帮助您探索和圈定领地。" : {
 
     },
     "%lld" : {
@@ -37,7 +37,7 @@
     "ap-southeast-1" : {
 
     },
-    "ZXHQUEST1979" : {
+    "ZJY79QUEST05X" : {
 
     },
     "English" : {
@@ -291,12 +291,12 @@
         }
       }
     },
-    "ZXH探索1979" : {
+    "ZJY79Quest05X" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ZXHQuest1979zjy05"
+            "value" : "ZJY79Quest05X"
           }
         }
       }

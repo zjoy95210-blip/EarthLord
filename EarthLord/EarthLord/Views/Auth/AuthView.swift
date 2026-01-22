@@ -103,7 +103,7 @@ struct AuthView: View {
                 .shadow(color: .cyan.opacity(0.5), radius: 20)
 
             // 标题
-            Text("ZXH探索1979")
+            Text("ZJY79Quest05X")
                 .font(.system(size: 36, weight: .bold))
                 .foregroundColor(.white)
 
