@@ -13,7 +13,7 @@
     "[%@]" : {
 
     },
-    "《纯燕麦》需要获取您的位置来显示您在末日世界中的坐标，帮助您探索和圈定领地。" : {
+    "《ZXH探索1979》需要获取您的位置来显示您在末日世界中的坐标，帮助您探索和圈定领地。" : {
 
     },
     "%lld" : {
@@ -37,7 +37,7 @@
     "ap-southeast-1" : {
 
     },
-    "PURE OATS" : {
+    "ZXHQUEST1979" : {
 
     },
     "English" : {
@@ -291,12 +291,12 @@
         }
       }
     },
-    "纯燕麦" : {
+    "ZXH探索1979" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pure Oats"
+            "value" : "ZXHQuest1979zjy05"
           }
         }
       }
