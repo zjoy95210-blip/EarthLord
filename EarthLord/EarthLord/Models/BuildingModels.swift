@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import CoreLocation
 
 // MARK: - 建筑分类枚举
 /// 建筑类型分类
@@ -51,12 +52,14 @@ enum BuildingCategory: String, Codable, CaseIterable, Sendable {
 enum BuildingStatus: String, Codable, Sendable {
     case constructing = "constructing"  // 建造中
     case active = "active"              // 已激活
+    case upgrading = "upgrading"        // 升级中
 
     /// 显示名称
     var displayName: String {
         switch self {
         case .constructing: return "建造中"
         case .active: return "已完成"
+        case .upgrading: return "升级中"
         }
     }
 
@@ -65,6 +68,7 @@ enum BuildingStatus: String, Codable, Sendable {
         switch self {
         case .constructing: return "hammer.fill"
         case .active: return "checkmark.circle.fill"
+        case .upgrading: return "arrow.up.circle.fill"
         }
     }
 }
@@ -149,6 +153,8 @@ struct PlayerBuilding: Codable, Identifiable, Sendable {
     let startedAt: Date?            // 开始建造时间
     var completedAt: Date?          // 完成时间
     let createdAt: Date
+    var locationLat: Double?        // 建筑纬度
+    var locationLon: Double?        // 建筑经度
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -160,6 +166,14 @@ struct PlayerBuilding: Codable, Identifiable, Sendable {
         case startedAt = "started_at"
         case completedAt = "completed_at"
         case createdAt = "created_at"
+        case locationLat = "location_lat"
+        case locationLon = "location_lon"
+    }
+
+    /// 建筑坐标（如果有位置信息）
+    var coordinate: CLLocationCoordinate2D? {
+        guard let lat = locationLat, let lon = locationLon else { return nil }
+        return CLLocationCoordinate2D(latitude: lat, longitude: lon)
     }
 
     /// 计算剩余建造时间（秒）
@@ -211,6 +225,8 @@ struct PlayerBuildingInsert: Codable, Sendable {
     let level: Int
     let status: String
     let startedAt: Date
+    let locationLat: Double?
+    let locationLon: Double?
 
     enum CodingKeys: String, CodingKey {
         case userId = "user_id"
@@ -219,6 +235,8 @@ struct PlayerBuildingInsert: Codable, Sendable {
         case level
         case status
         case startedAt = "started_at"
+        case locationLat = "location_lat"
+        case locationLon = "location_lon"
     }
 }
 
@@ -249,6 +267,7 @@ enum BuildingError: LocalizedError {
     case invalidStatus              // 无效状态（如建造中无法升级）
     case jsonLoadFailed             // JSON 加载失败
     case databaseError(String)      // 数据库错误
+    case invalidLocation            // 位置无效（不在领地内）
 
     var errorDescription: String? {
         switch self {
@@ -272,6 +291,8 @@ enum BuildingError: LocalizedError {
             return "加载建筑模板失败"
         case .databaseError(let message):
             return "数据库错误: \(message)"
+        case .invalidLocation:
+            return "建筑位置必须在领地范围内"
         }
     }
 }

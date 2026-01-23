@@ -266,6 +266,30 @@ final class TerritoryManager: ObservableObject {
         }
     }
 
+    /// 重命名领地
+    /// - Parameters:
+    ///   - territoryId: 领地 ID
+    ///   - newName: 新名称
+    /// - Returns: 是否重命名成功
+    func renameTerritory(territoryId: UUID, newName: String) async -> Bool {
+        print("✏️ [领地] 开始重命名领地: \(territoryId) -> \(newName)")
+
+        do {
+            try await supabase
+                .from("territories")
+                .update(["name": newName])
+                .eq("id", value: territoryId.uuidString)
+                .execute()
+
+            print("✅ [领地] 领地重命名成功")
+            return true
+
+        } catch {
+            print("❌ [领地] 重命名失败: \(error.localizedDescription)")
+            return false
+        }
+    }
+
     // MARK: - 碰撞检测算法
 
     /// 射线法判断点是否在多边形内

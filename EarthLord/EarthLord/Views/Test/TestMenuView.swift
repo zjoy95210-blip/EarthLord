@@ -11,6 +11,29 @@ struct TestMenuView: View {
 
     var body: some View {
         List {
+            // 开发者工具
+            Section {
+                NavigationLink {
+                    DeveloperToolsView()
+                } label: {
+                    Label("开发者工具", systemImage: "wrench.and.screwdriver")
+                }
+            } header: {
+                Text("调试工具")
+            }
+
+            // 功能测试
+            Section {
+                NavigationLink {
+                    TerritoryTestView()
+                } label: {
+                    Label("领地测试", systemImage: "flag")
+                }
+            } header: {
+                Text("功能测试")
+            }
+
+            // 关于
             Section {
                 HStack {
                     Image(systemName: "info.circle")

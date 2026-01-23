@@ -149,6 +149,15 @@ final class InventoryManager {
         }
     }
 
+    /// 获取指定物品的总数量
+    /// - Parameter itemId: 物品ID
+    /// - Returns: 物品总数量
+    func getItemCount(itemId: String) -> Int {
+        return items
+            .filter { $0.itemId == itemId }
+            .reduce(0) { $0 + $1.quantity }
+    }
+
     /// 搜索物品
     func searchItems(keyword: String) -> [DBInventoryItem] {
         if keyword.isEmpty {

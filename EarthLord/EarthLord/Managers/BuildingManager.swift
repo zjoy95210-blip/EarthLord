@@ -9,6 +9,7 @@
 import Foundation
 import Observation
 import Supabase
+import CoreLocation
 
 /// 建筑管理器
 @MainActor
@@ -171,14 +172,16 @@ final class BuildingManager {
             }
         }
 
-        // 创建建筑记录
+        // 创建建筑记录（无位置）
         let insert = PlayerBuildingInsert(
             userId: userId,
             territoryId: territoryId,
             templateId: templateId,
             level: 1,
             status: BuildingStatus.constructing.rawValue,
-            startedAt: Date()
+            startedAt: Date(),
+            locationLat: nil,
+            locationLon: nil
         )
 
         let building: PlayerBuilding = try await supabase
@@ -194,6 +197,102 @@ final class BuildingManager {
 
         print("🏗️ [建筑] 开始建造: \(template.name)")
         return building
+    }
+
+    /// 开始建造建筑（带位置）
+    /// - Parameters:
+    ///   - templateId: 建筑模板 ID
+    ///   - territoryId: 领地 ID
+    ///   - location: 建筑位置坐标
+    /// - Returns: 新建的建筑
+    func startConstruction(templateId: String, territoryId: UUID, location: CLLocationCoordinate2D) async throws -> PlayerBuilding {
+        // 先检查是否可以建造
+        let checkResult = await canBuild(templateId: templateId, territoryId: territoryId)
+        if !checkResult.canBuild {
+            throw checkResult.error ?? BuildingError.insufficientMaterials
+        }
+
+        guard let userId = supabaseService.currentUserId else {
+            throw BuildingError.notAuthenticated
+        }
+
+        guard let template = getTemplate(id: templateId) else {
+            throw BuildingError.templateNotFound
+        }
+
+        // 扣除材料
+        for required in template.requiredMaterials {
+            let matchingItems = inventoryManager.items.filter { $0.itemId == required.itemId }
+            var remainingToDeduct = required.quantity
+
+            for item in matchingItems {
+                if remainingToDeduct <= 0 { break }
+
+                let deductAmount = min(item.quantity, remainingToDeduct)
+                try await inventoryManager.useItem(inventoryItemId: item.id, quantity: deductAmount)
+                remainingToDeduct -= deductAmount
+            }
+        }
+
+        // 创建建筑记录（带位置）
+        let insert = PlayerBuildingInsert(
+            userId: userId,
+            territoryId: territoryId,
+            templateId: templateId,
+            level: 1,
+            status: BuildingStatus.constructing.rawValue,
+            startedAt: Date(),
+            locationLat: location.latitude,
+            locationLon: location.longitude
+        )
+
+        let building: PlayerBuilding = try await supabase
+            .from("player_buildings")
+            .insert(insert)
+            .select()
+            .single()
+            .execute()
+            .value
+
+        // 添加到本地列表
+        buildings.append(building)
+
+        // 发送建筑更新通知
+        NotificationCenter.default.post(name: .buildingUpdated, object: building.id)
+
+        print("🏗️ [建筑] 开始建造: \(template.name) 位置: (\(location.latitude), \(location.longitude))")
+        return building
+    }
+
+    /// 拆除建筑
+    /// - Parameter buildingId: 建筑 ID
+    func demolishBuilding(buildingId: UUID) async throws {
+        guard supabaseService.currentUserId != nil else {
+            throw BuildingError.notAuthenticated
+        }
+
+        guard let building = buildings.first(where: { $0.id == buildingId }) else {
+            throw BuildingError.buildingNotFound
+        }
+
+        // 从数据库删除
+        try await supabase
+            .from("player_buildings")
+            .delete()
+            .eq("id", value: buildingId)
+            .execute()
+
+        // 从本地列表移除
+        buildings.removeAll { $0.id == buildingId }
+
+        // 发送建筑更新通知
+        NotificationCenter.default.post(name: .buildingUpdated, object: building.territoryId)
+
+        if let template = getTemplate(id: building.templateId) {
+            print("🗑️ [建筑] 已拆除: \(template.name)")
+        } else {
+            print("🗑️ [建筑] 已拆除建筑")
+        }
     }
 
     /// 完成建筑建造
@@ -284,6 +383,14 @@ final class BuildingManager {
     }
 
     // MARK: - Fetch Methods
+
+    /// 加载并返回指定领地的建筑列表
+    /// - Parameter territoryId: 领地 ID
+    /// - Returns: 建筑列表
+    func loadBuildings(for territoryId: UUID) async throws -> [PlayerBuilding] {
+        try await fetchPlayerBuildings(territoryId: territoryId)
+        return getBuildings(territoryId: territoryId)
+    }
 
     /// 获取指定领地的建筑
     /// - Parameter territoryId: 领地 ID
