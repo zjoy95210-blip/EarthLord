@@ -1,0 +1,5 @@
+# Xcode archives
+*.xcarchive/
+
+# MCP config (contains secrets)
+.mcp.json
