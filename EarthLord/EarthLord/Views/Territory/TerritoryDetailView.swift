@@ -27,6 +27,9 @@ struct TerritoryDetailView: View {
     /// 建筑管理器
     private let buildingManager = BuildingManager.shared
 
+    /// 是否显示设置菜单
+    @State private var showSettingsDialog = false
+
     /// 是否显示删除确认
     @State private var showDeleteAlert = false
 
@@ -121,6 +124,10 @@ struct TerritoryDetailView: View {
         }
         .onAppear {
             loadBuildings()
+            // 检查并完成已到时间的建筑
+            Task {
+                await buildingManager.checkAndCompleteBuildings()
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .buildingUpdated)) { _ in
             loadBuildings()
@@ -148,6 +155,16 @@ struct TerritoryDetailView: View {
                     buildings.append(building)
                 }
             )
+        }
+        .confirmationDialog("领地设置", isPresented: $showSettingsDialog, titleVisibility: .visible) {
+            Button("重命名领地") {
+                newName = territory.name ?? ""
+                showRenameAlert = true
+            }
+            Button("删除领地", role: .destructive) {
+                showDeleteAlert = true
+            }
+            Button("取消", role: .cancel) {}
         }
         .alert("重命名领地", isPresented: $showRenameAlert) {
             TextField("输入新名称", text: $newName)
@@ -192,6 +209,18 @@ struct TerritoryDetailView: View {
 
                         // 建筑列表
                         buildingListSection
+
+                        // 删除领地按钮
+                        Button(role: .destructive) {
+                            showDeleteAlert = true
+                        } label: {
+                            Label("删除领地", systemImage: "trash")
+                                .foregroundColor(ApocalypseTheme.danger)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(ApocalypseTheme.danger.opacity(0.1))
+                                .cornerRadius(12)
+                        }
                     }
                     .padding()
                 }
@@ -362,8 +391,7 @@ struct TerritoryDetailView: View {
 
     /// 显示设置菜单
     private func showSettingsMenu() {
-        newName = territory.name ?? ""
-        showRenameAlert = true
+        showSettingsDialog = true
     }
 
     /// 加载建筑列表

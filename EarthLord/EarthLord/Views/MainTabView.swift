@@ -53,13 +53,15 @@ struct MainTabView: View {
                 }
                 .tag(4)
 
-            // 更多 - 开发测试入口
+            #if DEBUG
+            // 更多 - 开发测试入口（仅调试模式可见）
             MoreTabView()
                 .tabItem {
                     Image(systemName: "ellipsis.circle.fill")
                     Text("更多")
                 }
                 .tag(5)
+            #endif
         }
         .tint(ApocalypseTheme.primary)
     }

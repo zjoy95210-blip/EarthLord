@@ -77,6 +77,12 @@ struct MapTabView: View {
     /// 是否显示搜刮结果
     @State private var showScavengeResult: Bool = false
 
+    /// 建筑管理器
+    @State private var buildingManager = BuildingManager.shared
+
+    /// 建筑更新版本号
+    @State private var buildingUpdateVersion: Int = 0
+
     /// 领地管理器
     private let territoryManager = TerritoryManager.shared
 
@@ -95,6 +101,9 @@ struct MapTabView: View {
                 isPathClosed: locationManager.isPathClosed,
                 territories: territories,
                 currentUserId: authManager.currentUser?.id.uuidString,
+                playerBuildings: buildingManager.buildings,
+                buildingTemplates: buildingManager.templates,
+                buildingUpdateVersion: buildingUpdateVersion,
                 nearbyPOIs: explorationManager.nearbyPOIs,
                 poiUpdateVersion: explorationManager.poiUpdateVersion,
                 onPOITapped: { poi in
@@ -252,9 +261,15 @@ struct MapTabView: View {
         }
         .onAppear {
             setupLocation()
-            // 加载已有领地
+            // 加载已有领地和建筑
             Task {
                 await loadTerritories()
+                await loadBuildings()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .buildingUpdated)) { _ in
+            Task {
+                await loadBuildings()
             }
         }
         // 监听闭环状态，闭环后根据验证结果显示横幅
@@ -916,7 +931,7 @@ struct MapTabView: View {
                     .foregroundColor(ApocalypseTheme.textPrimary)
 
                 // 说明
-                Text("《ZJY79Quest05X》需要获取您的位置来显示您在末日世界中的坐标，帮助您探索和圈定领地。")
+                Text("《地球新主_文明重启》需要获取您的位置来显示您在末日世界中的坐标，帮助您探索和圈定领地。")
                     .font(.subheadline)
                     .foregroundColor(ApocalypseTheme.textSecondary)
                     .multilineTextAlignment(.center)
@@ -963,6 +978,17 @@ struct MapTabView: View {
             locationManager.startUpdatingLocation()
         } else if locationManager.isDenied {
             print("❌ [地图页] 定位权限被拒绝")
+        }
+    }
+
+    /// 加载所有建筑
+    private func loadBuildings() async {
+        do {
+            try await buildingManager.fetchAllPlayerBuildings()
+            buildingUpdateVersion += 1
+            print("🏗️ [地图页] 建筑加载完成，共 \(buildingManager.buildings.count) 个")
+        } catch {
+            print("❌ [地图页] 建筑加载失败: \(error.localizedDescription)")
         }
     }
 

@@ -8,6 +8,7 @@
 
 import Foundation
 import Observation
+import Supabase
 
 /// 背包管理器
 @MainActor
@@ -187,6 +188,62 @@ final class InventoryManager {
         itemDefinitions = []
         errorMessage = nil
     }
+
+    // MARK: - Debug Methods
+
+    #if DEBUG
+    /// 添加测试资源（从物品定义中取材料类物品，各添加一定数量）
+    func addTestResources() async -> Bool {
+        // 确保物品定义已加载
+        if itemDefinitions.isEmpty {
+            await loadInventory()
+        }
+
+        // 筛选材料类物品
+        let materialItems = itemDefinitions.filter { $0.category == .material }
+
+        guard !materialItems.isEmpty else {
+            print("❌ [测试] 没有找到材料类物品定义")
+            return false
+        }
+
+        do {
+            for item in materialItems {
+                try await addItem(itemId: item.id, quantity: 50, quality: nil)
+                print("✅ [测试] 添加 50 个 \(item.name)")
+            }
+            await loadInventory()
+            print("✅ [测试] 测试资源添加完成")
+            return true
+        } catch {
+            print("❌ [测试] 添加测试资源失败: \(error.localizedDescription)")
+            return false
+        }
+    }
+
+    /// 清空所有背包物品
+    func clearAllItems() async -> Bool {
+        guard let userId = supabaseService.currentUserId else {
+            print("❌ [测试] 用户未登录")
+            return false
+        }
+
+        do {
+            try await supabase
+                .from("inventory_items")
+                .delete()
+                .eq("user_id", value: userId)
+                .execute()
+
+            items = []
+            print("✅ [测试] 已清空所有背包物品")
+            return true
+        } catch {
+            print("❌ [测试] 清空背包失败: \(error.localizedDescription)")
+            return false
+        }
+    }
+    #endif
 }
 
 // MARK: - Item Display Helper

@@ -42,6 +42,17 @@ struct MapViewRepresentable: UIViewRepresentable {
     /// 当前用户 ID（用于区分自己和他人的领地）
     var currentUserId: String?
 
+    // MARK: - 建筑显示属性
+
+    /// 玩家建筑列表
+    var playerBuildings: [PlayerBuilding]
+
+    /// 建筑模板列表
+    var buildingTemplates: [BuildingTemplate]
+
+    /// 建筑更新版本号
+    var buildingUpdateVersion: Int
+
     // MARK: - POI 显示属性
 
     /// 附近 POI 列表
@@ -114,6 +125,12 @@ struct MapViewRepresentable: UIViewRepresentable {
             context.coordinator.drawTerritories(on: mapView, territories: territories, currentUserId: currentUserId)
         }
 
+        // 检测建筑版本变化，更新建筑标注
+        if context.coordinator.lastBuildingVersion != buildingUpdateVersion {
+            context.coordinator.lastBuildingVersion = buildingUpdateVersion
+            context.coordinator.updateBuildingAnnotations(on: mapView, buildings: playerBuildings, templates: buildingTemplates)
+        }
+
         // 检测 POI 版本变化，更新 POI 标注
         if context.coordinator.lastPOIVersion != poiUpdateVersion {
             context.coordinator.lastPOIVersion = poiUpdateVersion
@@ -178,6 +195,12 @@ struct MapViewRepresentable: UIViewRepresentable {
 
         /// 当前用户 ID
         var currentUserId: String?
+
+        /// 上次建筑版本号（用于检测更新）
+        var lastBuildingVersion: Int = 0
+
+        /// 建筑标注引用
+        private var buildingAnnotations: [MapBuildingAnnotation] = []
 
         /// 上次 POI 版本号（用于检测更新）
         var lastPOIVersion: Int = 0
@@ -310,6 +333,38 @@ struct MapViewRepresentable: UIViewRepresentable {
             print("✅ [领地] 领地绘制完成")
         }
 
+        // MARK: - 建筑标注更新
+
+        /// 更新建筑标注
+        func updateBuildingAnnotations(on mapView: MKMapView, buildings: [PlayerBuilding], templates: [BuildingTemplate]) {
+            // 移除旧标注
+            if !buildingAnnotations.isEmpty {
+                mapView.removeAnnotations(buildingAnnotations)
+                buildingAnnotations.removeAll()
+            }
+
+            guard !buildings.isEmpty else { return }
+
+            // 建筑模板字典
+            let templateDict = Dictionary(uniqueKeysWithValues: templates.map { ($0.id, $0) })
+
+            // 添加新标注
+            for building in buildings {
+                guard let coordinate = building.coordinate else { continue }
+                let template = templateDict[building.templateId]
+                let annotation = MapBuildingAnnotation(
+                    building: building,
+                    template: template
+                )
+                // 直接使用 building.coordinate（数据库已是 GCJ-02，不转换）
+                annotation.coordinate = coordinate
+                mapView.addAnnotation(annotation)
+                buildingAnnotations.append(annotation)
+            }
+
+            print("🏗️ [地图] 已更新 \(buildings.count) 个建筑标注")
+        }
+
         // MARK: - POI 标注更新
 
         /// 更新 POI 标注
@@ -440,6 +495,42 @@ struct MapViewRepresentable: UIViewRepresentable {
             // 用户位置使用系统默认
             if annotation is MKUserLocation { return nil }
 
+            // 建筑标注
+            if let buildingAnnotation = annotation as? MapBuildingAnnotation {
+                let identifier = "MapBuildingAnnotation"
+                var annotationView = mapView.dequeueReusableAnnotationView(withIdentifier: identifier) as? MKMarkerAnnotationView
+
+                if annotationView == nil {
+                    annotationView = MKMarkerAnnotationView(annotation: buildingAnnotation, reuseIdentifier: identifier)
+                    annotationView?.canShowCallout = true
+                } else {
+                    annotationView?.annotation = buildingAnnotation
+                }
+
+                // 根据状态设置颜色
+                switch buildingAnnotation.building.status {
+                case .constructing:
+                    annotationView?.markerTintColor = .systemYellow
+                case .upgrading:
+                    annotationView?.markerTintColor = .systemBlue
+                case .active:
+                    if let template = buildingAnnotation.template {
+                        annotationView?.markerTintColor = UIColor(Color(hex: template.category.colorHex))
+                    } else {
+                        annotationView?.markerTintColor = .systemGreen
+                    }
+                }
+
+                // 设置图标
+                if let template = buildingAnnotation.template {
+                    annotationView?.glyphImage = UIImage(systemName: template.iconName)
+                } else {
+                    annotationView?.glyphImage = UIImage(systemName: "building.2.fill")
+                }
+
+                return annotationView
+            }
+
             // POI 标注
             if let poiAnnotation = annotation as? POIAnnotation {
                 let identifier = "POIAnnotation"
@@ -531,6 +622,30 @@ struct MapViewRepresentable: UIViewRepresentable {
     }
 }
 
+// MARK: - Map Building Annotation
+
+/// 建筑标注类（主地图用）
+class MapBuildingAnnotation: MKPointAnnotation {
+    let building: PlayerBuilding
+    let template: BuildingTemplate?
+
+    override var title: String? {
+        get { template?.name ?? "建筑" }
+        set { }
+    }
+
+    override var subtitle: String? {
+        get { "Lv.\(building.level) - \(building.status.displayName)" }
+        set { }
+    }
+
+    init(building: PlayerBuilding, template: BuildingTemplate?) {
+        self.building = building
+        self.template = template
+        super.init()
+    }
+}
+
 // MARK: - POI Annotation
 
 /// POI 标注类
@@ -556,6 +671,9 @@ class POIAnnotation: MKPointAnnotation {
         isPathClosed: false,
         territories: [],
         currentUserId: nil,
+        playerBuildings: [],
+        buildingTemplates: [],
+        buildingUpdateVersion: 0,
         nearbyPOIs: [],
         poiUpdateVersion: 0,
         onPOITapped: nil

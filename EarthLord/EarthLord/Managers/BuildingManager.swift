@@ -173,13 +173,15 @@ final class BuildingManager {
         }
 
         // 创建建筑记录（无位置）
+        let now = Date()
         let insert = PlayerBuildingInsert(
             userId: userId,
             territoryId: territoryId,
             templateId: templateId,
             level: 1,
             status: BuildingStatus.constructing.rawValue,
-            startedAt: Date(),
+            startedAt: now,
+            completedAt: now.addingTimeInterval(Double(template.buildTime)),
             locationLat: nil,
             locationLon: nil
         )
@@ -235,13 +237,15 @@ final class BuildingManager {
         }
 
         // 创建建筑记录（带位置）
+        let now = Date()
         let insert = PlayerBuildingInsert(
             userId: userId,
             territoryId: territoryId,
             templateId: templateId,
             level: 1,
             status: BuildingStatus.constructing.rawValue,
-            startedAt: Date(),
+            startedAt: now,
+            completedAt: now.addingTimeInterval(Double(template.buildTime)),
             locationLat: location.latitude,
             locationLon: location.longitude
         )

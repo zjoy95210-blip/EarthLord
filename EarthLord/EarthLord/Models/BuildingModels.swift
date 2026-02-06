@@ -7,6 +7,7 @@
 
 import Foundation
 import CoreLocation
+import SwiftUI
 
 // MARK: - 建筑分类枚举
 /// 建筑类型分类
@@ -69,6 +70,15 @@ enum BuildingStatus: String, Codable, Sendable {
         case .constructing: return "hammer.fill"
         case .active: return "checkmark.circle.fill"
         case .upgrading: return "arrow.up.circle.fill"
+        }
+    }
+
+    /// 状态颜色
+    var color: Color {
+        switch self {
+        case .constructing: return .orange
+        case .upgrading: return .blue
+        case .active: return .green
         }
     }
 }
@@ -176,6 +186,37 @@ struct PlayerBuilding: Codable, Identifiable, Sendable {
         return CLLocationCoordinate2D(latitude: lat, longitude: lon)
     }
 
+    /// 建造进度（0.0 ~ 1.0），基于 startedAt 和 completedAt 计算
+    var buildProgress: Double {
+        guard status == .constructing || status == .upgrading,
+              let startedAt = startedAt,
+              let completedAt = completedAt else { return 0 }
+        let total = completedAt.timeIntervalSince(startedAt)
+        guard total > 0 else { return 1.0 }
+        let elapsed = Date().timeIntervalSince(startedAt)
+        return min(1.0, max(0, elapsed / total))
+    }
+
+    /// 格式化剩余时间（基于 completedAt，无需传入 buildTime）
+    var formattedRemainingTime: String {
+        guard status == .constructing || status == .upgrading,
+              let completedAt = completedAt else { return "" }
+        let remaining = completedAt.timeIntervalSince(Date())
+        guard remaining > 0 else { return "即将完成" }
+        let seconds = Int(remaining)
+        if seconds >= 3600 {
+            let hours = seconds / 3600
+            let minutes = (seconds % 3600) / 60
+            return "\(hours)小时\(minutes)分钟"
+        } else if seconds >= 60 {
+            let minutes = seconds / 60
+            let secs = seconds % 60
+            return "\(minutes)分\(secs)秒"
+        } else {
+            return "\(seconds)秒"
+        }
+    }
+
     /// 计算剩余建造时间（秒）
     /// - Parameter buildTime: 建造所需总时间（从模板获取）
     /// - Returns: 剩余秒数，如果已完成返回 0
@@ -225,6 +266,7 @@ struct PlayerBuildingInsert: Codable, Sendable {
     let level: Int
     let status: String
     let startedAt: Date
+    let completedAt: Date?
     let locationLat: Double?
     let locationLon: Double?
 
@@ -235,6 +277,7 @@ struct PlayerBuildingInsert: Codable, Sendable {
         case level
         case status
         case startedAt = "started_at"
+        case completedAt = "completed_at"
         case locationLat = "location_lat"
         case locationLon = "location_lon"
     }

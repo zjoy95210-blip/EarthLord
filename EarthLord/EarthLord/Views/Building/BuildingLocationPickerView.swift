@@ -15,6 +15,12 @@ struct BuildingLocationPickerView: View {
     /// 领地
     let territory: Territory
 
+    /// 已有建筑列表
+    let existingBuildings: [PlayerBuilding]
+
+    /// 建筑模板字典
+    let buildingTemplates: [String: BuildingTemplate]
+
     /// 选择位置回调
     let onSelect: (CLLocationCoordinate2D) -> Void
 
@@ -60,6 +66,8 @@ struct BuildingLocationPickerView: View {
                 LocationPickerMapView(
                     polygonCoordinates: polygonCoordinates,
                     centerCoordinate: centerCoordinate,
+                    existingBuildings: existingBuildings,
+                    buildingTemplates: buildingTemplates,
                     selectedLocation: $selectedLocation,
                     isLocationValid: $isLocationValid,
                     validateLocation: validateLocation
@@ -168,6 +176,8 @@ struct LocationPickerMapView: UIViewRepresentable {
 
     let polygonCoordinates: [CLLocationCoordinate2D]
     let centerCoordinate: CLLocationCoordinate2D
+    let existingBuildings: [PlayerBuilding]
+    let buildingTemplates: [String: BuildingTemplate]
     @Binding var selectedLocation: CLLocationCoordinate2D?
     @Binding var isLocationValid: Bool
     let validateLocation: (CLLocationCoordinate2D) -> Bool
@@ -209,11 +219,28 @@ struct LocationPickerMapView: UIViewRepresentable {
                 )
                 mapView.setRegion(region, animated: false)
                 context.coordinator.isFirstLoad = false
+
+                // 首次加载时添加已有建筑标注
+                addExistingBuildings(to: mapView)
             }
         }
 
         // 更新选择点标注
         updateSelectedAnnotation(mapView, context: context)
+    }
+
+    /// 添加已有建筑标注到地图
+    private func addExistingBuildings(to mapView: MKMapView) {
+        for building in existingBuildings {
+            guard let coordinate = building.coordinate else { continue }
+            let template = buildingTemplates[building.templateId]
+            let annotation = ExistingBuildingAnnotation(
+                coordinate: coordinate,
+                buildingName: template?.name ?? "建筑",
+                iconName: template?.iconName ?? "building.2.fill"
+            )
+            mapView.addAnnotation(annotation)
+        }
     }
 
     private func updateSelectedAnnotation(_ mapView: MKMapView, context: Context) {
@@ -264,6 +291,26 @@ struct LocationPickerMapView: UIViewRepresentable {
         }
 
         func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
+            // 已有建筑标注
+            if let existingAnnotation = annotation as? ExistingBuildingAnnotation {
+                let identifier = "ExistingBuildingAnnotation"
+                var annotationView = mapView.dequeueReusableAnnotationView(withIdentifier: identifier) as? MKMarkerAnnotationView
+
+                if annotationView == nil {
+                    annotationView = MKMarkerAnnotationView(annotation: existingAnnotation, reuseIdentifier: identifier)
+                    annotationView?.canShowCallout = true
+                } else {
+                    annotationView?.annotation = existingAnnotation
+                }
+
+                annotationView?.markerTintColor = .systemGray
+                annotationView?.glyphImage = UIImage(systemName: existingAnnotation.iconName)
+                annotationView?.alpha = 0.8
+
+                return annotationView
+            }
+
+            // 选择点标注
             guard let selectionAnnotation = annotation as? SelectionAnnotation else {
                 return nil
             }
@@ -288,6 +335,22 @@ struct LocationPickerMapView: UIViewRepresentable {
 
             return annotationView
         }
+    }
+}
+
+// MARK: - 已有建筑标注
+class ExistingBuildingAnnotation: NSObject, MKAnnotation {
+    let coordinate: CLLocationCoordinate2D
+    let buildingName: String
+    let iconName: String
+
+    var title: String? { buildingName }
+
+    init(coordinate: CLLocationCoordinate2D, buildingName: String, iconName: String) {
+        self.coordinate = coordinate
+        self.buildingName = buildingName
+        self.iconName = iconName
+        super.init()
     }
 }
 
@@ -325,6 +388,8 @@ class SelectionAnnotation: NSObject, MKAnnotation {
 
     BuildingLocationPickerView(
         territory: sampleTerritory,
+        existingBuildings: [],
+        buildingTemplates: [:],
         onSelect: { _ in },
         onCancel: {}
     )

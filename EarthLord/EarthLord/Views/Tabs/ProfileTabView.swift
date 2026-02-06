@@ -92,7 +92,8 @@ struct ProfileTabView: View {
                     Text("切换语言后立即生效，无需重启 App")
                 }
 
-                // 开发者工具
+                #if DEBUG
+                // 开发者工具（仅调试模式可见）
                 Section("开发调试") {
                     NavigationLink {
                         DeveloperToolsView()
@@ -100,6 +101,7 @@ struct ProfileTabView: View {
                         Label("开发者工具", systemImage: "wrench.and.screwdriver")
                     }
                 }
+                #endif
 
                 // 关于
                 Section("关于") {

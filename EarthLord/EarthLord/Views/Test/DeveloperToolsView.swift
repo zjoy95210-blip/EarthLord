@@ -45,6 +45,9 @@ struct DeveloperToolsView: View {
             // 材料管理
             materialSection
 
+            // 测试资源
+            testResourceSection
+
             // 数据查看
             dataSection
 
@@ -171,6 +174,31 @@ struct DeveloperToolsView: View {
         }
     }
 
+    // MARK: - 测试资源区域
+
+    private var testResourceSection: some View {
+        Section {
+            #if DEBUG
+            Button {
+                addTestResources()
+            } label: {
+                Label("添加测试资源（所有材料各50个）", systemImage: "plus.circle.fill")
+                    .foregroundColor(ApocalypseTheme.success)
+            }
+
+            Button(role: .destructive) {
+                clearAllInventoryItems()
+            } label: {
+                Label("清空背包", systemImage: "trash.circle")
+            }
+            #endif
+        } header: {
+            Text("测试资源")
+        } footer: {
+            Text("快速添加或清空背包物品，用于测试建造流程")
+        }
+    }
+
     // MARK: - 危险操作区域
 
     private var dangerSection: some View {
@@ -267,6 +295,26 @@ struct DeveloperToolsView: View {
             }
         }
     }
+
+    #if DEBUG
+    /// 添加测试资源
+    private func addTestResources() {
+        Task {
+            let success = await inventoryManager.addTestResources()
+            message = success ? "测试资源已添加（所有材料各50个）" : "添加测试资源失败"
+            showMessage = true
+        }
+    }
+
+    /// 清空背包所有物品
+    private func clearAllInventoryItems() {
+        Task {
+            let success = await inventoryManager.clearAllItems()
+            message = success ? "已清空所有背包物品" : "清空背包失败"
+            showMessage = true
+        }
+    }
+    #endif
 
     /// 清空所有建筑
     private func clearAllBuildings() {

@@ -157,7 +157,12 @@ struct TerritoryBuildingRow: View {
         .background(ApocalypseTheme.cardBackground)
         .cornerRadius(12)
         .onReceive(timer) { _ in
+            let previousRemaining = remainingSeconds
             currentTime = Date()
+            // 当倒计时刚好归零时，发送通知触发父视图重新加载
+            if previousRemaining > 0 && remainingSeconds <= 0 {
+                NotificationCenter.default.post(name: .buildingUpdated, object: building.territoryId)
+            }
         }
     }
 

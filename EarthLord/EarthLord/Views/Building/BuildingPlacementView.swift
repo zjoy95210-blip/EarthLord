@@ -51,10 +51,11 @@ struct BuildingPlacementView: View {
     private var resources: [ResourceInfo] {
         template.requiredMaterials.map { material in
             let owned = inventoryManager.getItemCount(itemId: material.itemId)
+            let itemDef = inventoryManager.getItemDefinition(id: material.itemId)
             return ResourceInfo(
                 itemId: material.itemId,
-                name: material.itemId,  // TODO: 从物品模板获取名称
-                iconName: "cube.box.fill",  // TODO: 从物品模板获取图标
+                name: itemDef?.name ?? material.itemId,
+                iconName: itemDef?.category.iconName ?? "cube.box.fill",
                 required: material.quantity,
                 owned: owned
             )
@@ -111,6 +112,8 @@ struct BuildingPlacementView: View {
             .sheet(isPresented: $showLocationPicker) {
                 BuildingLocationPickerView(
                     territory: territory,
+                    existingBuildings: buildingManager.getBuildings(territoryId: territory.id),
+                    buildingTemplates: Dictionary(uniqueKeysWithValues: buildingManager.templates.map { ($0.id, $0) }),
                     onSelect: { location in
                         selectedLocation = location
                         showLocationPicker = false
@@ -124,6 +127,12 @@ struct BuildingPlacementView: View {
                 Button("确定", role: .cancel) {}
             } message: {
                 Text(errorMessage ?? "未知错误")
+            }
+            .onAppear {
+                // 确保物品定义已加载（用于显示材料名称和图标）
+                if inventoryManager.itemDefinitions.isEmpty {
+                    Task { await inventoryManager.loadInventory() }
+                }
             }
         }
     }
