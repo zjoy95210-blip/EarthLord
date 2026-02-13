@@ -409,7 +409,7 @@ final class AuthManager: ObservableObject, Sendable {
                 errorMessage = "Apple 登录需要用户交互"
             case .failed:
                 errorMessage = "Apple 登录授权失败"
-            @unknown default:
+            default:
                 errorMessage = "Apple 登录失败: \(error.localizedDescription)"
             }
         } catch {
