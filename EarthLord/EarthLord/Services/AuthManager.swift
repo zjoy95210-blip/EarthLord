@@ -357,14 +357,95 @@ final class AuthManager: ObservableObject, Sendable {
     // MARK: - 第三方登录（预留）
 
     /// Apple 登录
-    /// - TODO: 实现 Sign in with Apple
     func signInWithApple() async {
-        // TODO: 实现 Apple 登录
-        // 1. 使用 ASAuthorizationController 获取 Apple ID credential
-        // 2. 调用 supabase.auth.signInWithIdToken(credentials:)
-        // 3. 处理登录结果
-        print("⚠️ Apple 登录功能待实现")
-        errorMessage = "Apple 登录功能即将推出"
+        print("🍎 [Apple登录] 开始 Apple 登录流程...")
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            // 1. 使用 ASAuthorizationController 获取 Apple ID credential
+            let credential = try await performAppleSignIn()
+            print("✅ [Apple登录] 获取到 Apple credential")
+
+            // 2. 获取 identityToken
+            guard let identityTokenData = credential.identityToken,
+                  let identityToken = String(data: identityTokenData, encoding: .utf8) else {
+                print("❌ [Apple登录] 无法获取 identityToken")
+                errorMessage = "Apple 登录失败：无法获取身份令牌"
+                isLoading = false
+                return
+            }
+            print("✅ [Apple登录] 成功获取 identityToken: \(identityToken.prefix(20))...")
+
+            // 3. 使用 Supabase 验证 Apple Token
+            print("🍎 [Apple登录] 正在向 Supabase 发送验证请求...")
+            let session = try await supabase.auth.signInWithIdToken(
+                credentials: .init(
+                    provider: .apple,
+                    idToken: identityToken
+                )
+            )
+
+            // 4. 登录成功
+            currentUser = session.user
+            isAuthenticated = true
+            print("✅ [Apple登录] Supabase 验证成功！")
+            print("✅ [Apple登录] 用户邮箱: \(session.user.email ?? "未知")")
+            print("✅ [Apple登录] 用户ID: \(session.user.id)")
+
+        } catch let error as ASAuthorizationError {
+            print("❌ [Apple登录] ASAuthorization 错误: \(error.localizedDescription)")
+            switch error.code {
+            case .canceled:
+                print("ℹ️ [Apple登录] 用户取消了登录")
+                errorMessage = nil
+            case .unknown:
+                errorMessage = "Apple 登录失败，请重试"
+            case .invalidResponse:
+                errorMessage = "Apple 登录响应无效"
+            case .notHandled:
+                errorMessage = "Apple 登录请求未处理"
+            case .notInteractive:
+                errorMessage = "Apple 登录需要用户交互"
+            case .failed:
+                errorMessage = "Apple 登录授权失败"
+            @unknown default:
+                errorMessage = "Apple 登录失败: \(error.localizedDescription)"
+            }
+        } catch {
+            print("❌ [Apple登录] 错误: \(error)")
+            errorMessage = "登录失败: \(error.localizedDescription)"
+        }
+
+        isLoading = false
+        print("🍎 [Apple登录] 登录流程结束")
+    }
+
+    /// 执行 Apple Sign In（将 delegate 回调包装为 async/await）
+    private func performAppleSignIn() async throws -> ASAuthorizationAppleIDCredential {
+        try await withCheckedThrowingContinuation { continuation in
+            let provider = ASAuthorizationAppleIDProvider()
+            let request = provider.createRequest()
+            request.requestedScopes = [.fullName, .email]
+
+            let delegate = AppleSignInDelegate(continuation: continuation)
+            let controller = ASAuthorizationController(authorizationRequests: [request])
+            controller.delegate = delegate
+
+            // 设置 presentationContextProviding
+            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+               let window = windowScene.windows.first {
+                let contextProvider = AppleSignInPresentationContext(window: window)
+                controller.presentationContextProvider = contextProvider
+                // 持有引用防止提前释放
+                objc_setAssociatedObject(controller, "contextProvider", contextProvider, .OBJC_ASSOCIATION_RETAIN)
+            }
+
+            // 持有 delegate 引用防止提前释放
+            objc_setAssociatedObject(controller, "delegate", delegate, .OBJC_ASSOCIATION_RETAIN)
+
+            controller.performRequests()
+        }
     }
 
     /// Google 登录
@@ -566,5 +647,43 @@ final class AuthManager: ObservableObject, Sendable {
         needsPasswordSetup = false
         currentEmail = nil
         errorMessage = nil
+    }
+}
+
+// MARK: - Apple Sign In Helper Classes
+
+/// ASAuthorizationController delegate，将回调桥接到 async/await continuation
+private class AppleSignInDelegate: NSObject, ASAuthorizationControllerDelegate {
+    private var continuation: CheckedContinuation<ASAuthorizationAppleIDCredential, Error>?
+
+    init(continuation: CheckedContinuation<ASAuthorizationAppleIDCredential, Error>) {
+        self.continuation = continuation
+    }
+
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
+        if let credential = authorization.credential as? ASAuthorizationAppleIDCredential {
+            continuation?.resume(returning: credential)
+        } else {
+            continuation?.resume(throwing: ASAuthorizationError(.unknown))
+        }
+        continuation = nil
+    }
+
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
+        continuation?.resume(throwing: error)
+        continuation = nil
+    }
+}
+
+/// ASAuthorizationController 的 presentationContextProviding
+private class AppleSignInPresentationContext: NSObject, ASAuthorizationControllerPresentationContextProviding {
+    private let window: UIWindow
+
+    init(window: UIWindow) {
+        self.window = window
+    }
+
+    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+        window
     }
 }

@@ -83,6 +83,9 @@ struct MapTabView: View {
     /// 建筑更新版本号
     @State private var buildingUpdateVersion: Int = 0
 
+    /// 是否已关闭定位权限提示横幅
+    @State private var dismissedLocationBanner: Bool = false
+
     /// 领地管理器
     private let territoryManager = TerritoryManager.shared
 
@@ -184,9 +187,10 @@ struct MapTabView: View {
             .animation(.spring(response: 0.5, dampingFraction: 0.7), value: locationManager.territoryValidationPassed)
             .animation(.spring(response: 0.5, dampingFraction: 0.7), value: showUploadResult)
 
-            // 权限拒绝提示
-            if locationManager.isDenied {
-                permissionDeniedOverlay
+            // 权限提示横幅（非阻断式）
+            if locationManager.isDenied && !dismissedLocationBanner {
+                locationPermissionBanner
+                    .transition(.move(edge: .top).combined(with: .opacity))
             }
 
             // Day 19: 碰撞警告横幅（分级颜色）
@@ -909,55 +913,58 @@ struct MapTabView: View {
         }
     }
 
-    // MARK: - 权限拒绝覆盖层
+    // MARK: - 定位权限提示横幅（非阻断式）
 
-    private var permissionDeniedOverlay: some View {
-        ZStack {
-            // 半透明背景
-            Color.black.opacity(0.7)
-                .ignoresSafeArea()
-
-            // 提示卡片
-            VStack(spacing: 20) {
-                // 图标
+    private var locationPermissionBanner: some View {
+        VStack {
+            HStack(spacing: 12) {
                 Image(systemName: "location.slash.fill")
-                    .font(.system(size: 60))
+                    .font(.title3)
                     .foregroundColor(ApocalypseTheme.warning)
 
-                // 标题
-                Text("定位权限已关闭")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(ApocalypseTheme.textPrimary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("定位服务未开启")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(ApocalypseTheme.textPrimary)
+                    Text("开启定位以使用完整功能")
+                        .font(.caption)
+                        .foregroundColor(ApocalypseTheme.textSecondary)
+                }
 
-                // 说明
-                Text("《地球新主_文明重启》需要获取您的位置来显示您在末日世界中的坐标，帮助您探索和圈定领地。")
-                    .font(.subheadline)
-                    .foregroundColor(ApocalypseTheme.textSecondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
+                Spacer()
 
-                // 按钮
                 Button {
                     locationManager.openSettings()
                 } label: {
-                    HStack {
-                        Image(systemName: "gear")
-                        Text("前往设置")
-                    }
-                    .font(.headline)
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(ApocalypseTheme.primary)
-                    .cornerRadius(12)
+                    Text("前往设置")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(ApocalypseTheme.primary)
+                        .cornerRadius(8)
                 }
-                .padding(.horizontal, 40)
+
+                Button {
+                    withAnimation {
+                        dismissedLocationBanner = true
+                    }
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.caption)
+                        .foregroundColor(ApocalypseTheme.textSecondary)
+                }
             }
-            .padding(30)
-            .background(ApocalypseTheme.cardBackground)
-            .cornerRadius(20)
-            .padding(30)
+            .padding(12)
+            .background(ApocalypseTheme.cardBackground.opacity(0.95))
+            .cornerRadius(12)
+            .shadow(color: .black.opacity(0.3), radius: 4, y: 2)
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+
+            Spacer()
         }
     }
 

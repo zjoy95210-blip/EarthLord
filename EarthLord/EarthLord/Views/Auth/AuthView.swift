@@ -182,7 +182,9 @@ struct AuthView: View {
         VStack(spacing: 12) {
             // Apple 登录
             Button {
-                showToast("Apple 登录即将开放")
+                Task {
+                    await authManager.signInWithApple()
+                }
             } label: {
                 HStack {
                     Image(systemName: "apple.logo")
