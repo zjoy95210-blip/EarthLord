@@ -187,8 +187,8 @@ struct MapTabView: View {
             .animation(.spring(response: 0.5, dampingFraction: 0.7), value: locationManager.territoryValidationPassed)
             .animation(.spring(response: 0.5, dampingFraction: 0.7), value: showUploadResult)
 
-            // 权限提示横幅（非阻断式）
-            if locationManager.isDenied && !dismissedLocationBanner {
+            // 权限提示横幅（非阻断式）：denied 或 restricted 时均显示
+            if locationManager.isLocationUnavailable && !dismissedLocationBanner {
                 locationPermissionBanner
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
@@ -916,35 +916,42 @@ struct MapTabView: View {
     // MARK: - 定位权限提示横幅（非阻断式）
 
     private var locationPermissionBanner: some View {
-        VStack {
+        let isRestricted = locationManager.isRestricted
+        let subtitle = isRestricted
+            ? "位置访问受设备限制，地图功能不可用，其余功能正常使用"
+            : "开启定位以使用圈地、探索等功能，其余功能不受影响"
+
+        return VStack {
             HStack(spacing: 12) {
                 Image(systemName: "location.slash.fill")
                     .font(.title3)
                     .foregroundColor(ApocalypseTheme.warning)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("定位服务未开启")
+                    Text("定位服务不可用")
                         .font(.subheadline)
                         .fontWeight(.semibold)
                         .foregroundColor(ApocalypseTheme.textPrimary)
-                    Text("开启定位以使用完整功能")
+                    Text(subtitle)
                         .font(.caption)
                         .foregroundColor(ApocalypseTheme.textSecondary)
                 }
 
                 Spacer()
 
-                Button {
-                    locationManager.openSettings()
-                } label: {
-                    Text("前往设置")
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(ApocalypseTheme.primary)
-                        .cornerRadius(8)
+                if !isRestricted {
+                    Button {
+                        locationManager.openSettings()
+                    } label: {
+                        Text("前往设置")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(ApocalypseTheme.primary)
+                            .cornerRadius(8)
+                    }
                 }
 
                 Button {
@@ -984,7 +991,11 @@ struct MapTabView: View {
             print("📍 [地图页] 已授权，开始定位")
             locationManager.startUpdatingLocation()
         } else if locationManager.isDenied {
+            // 用户手动拒绝：显示横幅引导前往设置
             print("❌ [地图页] 定位权限被拒绝")
+        } else if locationManager.isRestricted {
+            // 系统级限制（家长控制/MDM）：无法请求权限，显示受限提示
+            print("⚠️ [地图页] 定位功能受系统限制")
         }
     }
 

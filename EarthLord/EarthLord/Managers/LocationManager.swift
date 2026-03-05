@@ -131,6 +131,16 @@ final class LocationManager: NSObject, ObservableObject {
         authorizationStatus == .denied
     }
 
+    /// 是否被系统级别限制（如家长控制或企业 MDM）
+    var isRestricted: Bool {
+        authorizationStatus == .restricted
+    }
+
+    /// 定位不可用（被拒绝或被系统限制），App 需降级显示
+    var isLocationUnavailable: Bool {
+        authorizationStatus == .denied || authorizationStatus == .restricted
+    }
+
     /// 是否尚未决定
     var isNotDetermined: Bool {
         authorizationStatus == .notDetermined

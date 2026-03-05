@@ -432,9 +432,8 @@ final class AuthManager: ObservableObject, Sendable {
             let controller = ASAuthorizationController(authorizationRequests: [request])
             controller.delegate = delegate
 
-            // 设置 presentationContextProviding
-            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-               let window = windowScene.windows.first {
+            // 使用更健壮的方式查找关键窗口，兼容 iPad 多窗口 / Stage Manager 环境
+            if let window = Self.findKeyWindow() {
                 let contextProvider = AppleSignInPresentationContext(window: window)
                 controller.presentationContextProvider = contextProvider
                 // 持有引用防止提前释放
@@ -446,6 +445,32 @@ final class AuthManager: ObservableObject, Sendable {
 
             controller.performRequests()
         }
+    }
+
+    /// 查找当前关键窗口（优先前台活跃场景，兼容 iPad 多窗口）
+    private static func findKeyWindow() -> UIWindow? {
+        let scenes = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+
+        // 优先：前台活跃场景的 keyWindow
+        if let window = scenes
+            .first(where: { $0.activationState == .foregroundActive })?
+            .keyWindow {
+            return window
+        }
+
+        // 回退：任意场景中标记为 key 的窗口
+        for scene in scenes {
+            if let keyWindow = scene.keyWindow {
+                return keyWindow
+            }
+            if let keyWindow = scene.windows.first(where: { $0.isKeyWindow }) {
+                return keyWindow
+            }
+        }
+
+        // 最终回退：任意场景的第一个窗口
+        return scenes.first?.windows.first
     }
 
     /// Google 登录
